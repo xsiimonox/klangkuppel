@@ -2,6 +2,26 @@
 
 Eine kostenlose, iPad-taugliche Web-App für den MINT-Unterricht. Musik wird lokal im Browser analysiert und in eine druckbare, 80 mm breite Relief-Halbkugel übersetzt.
 
+## Integriertes Musiklabor
+
+Schülerinnen und Schüler können Musik jetzt direkt in KlangKuppel erstellen und ohne Datei-Export in eine 3D-Form verwandeln:
+
+- **Entdecken (7–10):** acht große Schritte und vier farbige Klangspuren
+- **Gestalten (11–14):** 16 Schritte, fünf Instrumente und frei wählbares Tempo
+- **Coden (ab 15):** textbasierte Rhythmus-Patterns und ein direkter Einstieg zu Strudel
+
+Alle Klänge werden mit der Web Audio API auf dem Gerät erzeugt und mit derselben Frequenzanalyse verarbeitet wie hochgeladene Musik.
+
+## 3D-Vorschau bedienen
+
+- Mit einem Finger oder der Maus frei um X-, Y- und Z-Achse drehen
+- Mit zwei Fingern zoomen und durch eine Drehgeste um die Blickachse rollen
+- Mit dem Mausrad zoomen
+- Feste Ansichten für Isometrie, Vorderseite, Ober- und Unterseite
+- Autodrehung, Reset und optionaler Drehteller mit Gitternetz
+
+Die Werkzeugspalte scrollt unabhängig, damit die vollständige 3D-Vorschau auf iPads und Desktop-Bildschirmen jederzeit sichtbar bleibt.
+
 ## Live verwenden
 
 Nach der Veröffentlichung über GitHub Pages läuft KlangKuppel direkt in Safari, Chrome oder Edge. Es ist keine Installation und kein Benutzerkonto nötig. Audiodateien werden ausschließlich lokal im Browser verarbeitet und nicht hochgeladen.
