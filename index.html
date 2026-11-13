@@ -30,6 +30,7 @@
     .mode-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-bottom:12px}
     .mode-tab{border:1px solid var(--line);background:#171823;color:#b9b8c5;border-radius:9px;padding:8px 3px;font-size:10px;font-weight:750;cursor:pointer}.mode-tab.active{background:var(--acid);border-color:var(--acid);color:#11130d}
     .mode-help{font-size:10px;line-height:1.4;color:var(--muted);margin:0 0 10px}
+    .shape-key{display:flex;flex-wrap:wrap;gap:5px;margin:8px 0 10px}.shape-key span{border:1px solid #ffffff16;background:#11121a99;border-radius:999px;padding:5px 7px;font-size:8px;color:#c9c8d3;white-space:nowrap}.shape-key b{color:var(--acid);font-weight:800}
     .seq-wrap{overflow-x:auto;padding-bottom:4px}.sequencer{display:grid;gap:5px;min-width:300px}
     .track-row{display:grid;grid-template-columns:55px repeat(var(--steps),1fr);gap:4px;align-items:center}.track-name{font-size:9px;color:#d9d8e1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .step{aspect-ratio:1;border:0;border-radius:5px;background:#353646;min-width:13px;cursor:pointer;padding:0;box-shadow:inset 0 0 0 1px #ffffff08}.step:nth-child(4n+2){box-shadow:inset 2px 0 0 #ffffff18}.step.on{background:var(--track);box-shadow:0 0 10px color-mix(in srgb,var(--track) 35%,transparent)}.step.playing{outline:2px solid white;outline-offset:1px}
@@ -84,7 +85,7 @@
 <body>
 <div class="app">
   <header>
-    <div class="brand"><div class="brand-mark" aria-hidden="true"></div><div>KlangKuppel<small>Music → Matter Lab · v1.3.0</small></div></div>
+    <div class="brand"><div class="brand-mark" aria-hidden="true"></div><div>KlangKuppel<small>Music → Matter Lab · v1.4.0</small></div></div>
     <div class="header-note">Alles bleibt auf diesem Gerät</div>
   </header>
   <main>
@@ -101,6 +102,7 @@
           <button class="mode-tab" data-mode="code" role="tab" aria-selected="false">ab 15<br>Coden</button>
         </div>
         <p class="mode-help" id="modeHelp">Tippe auf die bunten Felder: Jede Zeile ist ein Klang, jede Spalte ein Zeitpunkt.</p>
+        <div class="shape-key" aria-label="Zuordnung von Instrumenten zu Formen"><span><b>Bassdrum</b> Plateauberge</span><span><b>Snare</b> Ringmulden</span><span><b>Hi-Hat</b> Riefen</span><span><b>Bass</b> Wellen</span><span><b>Melodie</b> Spiralen</span></div>
         <div class="seq-wrap"><div class="sequencer" id="sequencer"></div></div>
         <div class="code-box" id="codeBox">
           <textarea id="patternCode" spellcheck="false" aria-label="Musikpattern als Code">kick: x---x---
@@ -131,14 +133,14 @@ lead: x--x--x-</textarea>
       <section class="section">
         <div class="section-head"><h2>Form gestalten</h2><span>Live-Vorschau</span></div>
         <div class="slider"><label for="relief">Reliefstärke</label><output id="reliefOut">6,0 mm</output><input id="relief" type="range" min="1" max="10" value="6" step="0.5"></div>
-        <div class="slider"><label for="sharpness">Rund ↔ spitz</label><output id="sharpnessOut">55 %</output><input id="sharpness" type="range" min="0" max="100" value="55" step="1"></div>
+        <div class="slider"><label for="sharpness">Rund ↔ kantig</label><output id="sharpnessOut">55 %</output><input id="sharpness" type="range" min="0" max="100" value="55" step="1"></div>
         <div class="slider"><label for="smooth">Glättung</label><output id="smoothOut">35 %</output><input id="smooth" type="range" min="0" max="80" value="35" step="1"></div>
         <div class="slider"><label for="ridges">Wellenrippen</label><output id="ridgesOut">70 %</output><input id="ridges" type="range" min="0" max="100" value="70"></div>
         <div class="slider"><label for="valleys">Mulden & Täler</label><output id="valleysOut">60 %</output><input id="valleys" type="range" min="0" max="100" value="60"></div>
         <div class="slider"><label for="texture">Fühlbare Textur</label><output id="textureOut">45 %</output><input id="texture" type="range" min="0" max="100" value="45"></div>
         <div class="slider"><label for="spirals">Schneckenspiralen</label><output id="spiralsOut">85 %</output><input id="spirals" type="range" min="0" max="100" value="85"></div>
         <div class="slider"><label for="circles">Kreise & Ringmulden</label><output id="circlesOut">80 %</output><input id="circles" type="range" min="0" max="100" value="80"></div>
-        <p class="mode-help">Klanglandschaft: Lautstärke → Höhe · Klangwechsel → Berge · tiefe Klänge → Wellen · leise Stellen → Mulden. Künstlerische Übersetzung der Frequenzanalyse.</p>
+        <p class="mode-help">Leeres Musikpattern → glatte Kuppel. Gipfel bleiben bewusst breit und abgeflacht, damit sie stabil und ohne nadelfeine Spitzen druckbar sind.</p>
         <div class="slider"><label for="detail">Detaildichte</label><output id="detailOut">Mittel</output><input id="detail" type="range" min="0" max="2" value="1" step="1"></div>
         <div class="slider"><label for="baseHeight">Bodenstärke</label><output id="baseOut">2,4 mm</output><input id="baseHeight" type="range" min="1.6" max="5" value="2.4" step="0.2"></div>
         <div class="checks">
@@ -155,7 +157,7 @@ lead: x--x--x-</textarea>
       <canvas id="canvas"></canvas>
       <div class="stage-top">
         <div class="badge" id="analysisBadge">● DEMO · SYNTHETISCHE KLANGDATEN</div>
-        <div class="legend"><div>Wellen · Rhythmus</div><div>Berge · Klangwechsel</div><div>Mulden · leise Stellen</div><div>Mattweiß · Druckvorschau</div></div>
+        <div class="legend"><div>Bassdrum · Plateauberge</div><div>Snare · Ringe & Täler</div><div>Hi-Hat/Bass · Riefen & Wellen</div><div>Melodie · Spiralen</div></div>
       </div>
       <div class="view-tools" aria-label="3D-Ansichten">
         <button class="view-btn active" id="autoRotate" aria-pressed="true">⟳ Auto</button>
@@ -197,11 +199,11 @@ lead: x--x--x-</textarea>
   const modelGroup=new THREE.Group();modelGroup.position.y=18;modelGroup.rotation.set(.55,.55,.04);scene.add(modelGroup);
 
   let mesh, audioBuffer=null, source=null, audioCtx=null, playing=false, demoSeed=2;
-  let spectral=makeDemo(demoSeed), geometryInfo={triangles:0,maxHeight:46};
+  let spectral=makeDemo(demoSeed),labShape=null,geometryInfo={triangles:0,maxHeight:46};
   const state={relief:6,sharpness:.55,smooth:.35,ridges:70,valleys:60,texture:45,spirals:85,circles:80,detail:1,baseHeight:2.4,mirror:false,wire:false};
   const mat=new THREE.MeshStandardMaterial({color:0xeee9e0,roughness:.72,metalness:0,vertexColors:false,side:THREE.FrontSide});
   const tracks={
-    kick:{name:'🥁 Bass',color:'#ff704c'},snare:{name:'👏 Snare',color:'#ffb84d'},hat:{name:'✨ Hi-Hat',color:'#b7f34b'},
+    kick:{name:'🥁 Bassdrum',color:'#ff704c'},snare:{name:'👏 Snare',color:'#ffb84d'},hat:{name:'✨ Hi-Hat',color:'#b7f34b'},
     bass:{name:'🎸 Bass',color:'#48d7c8'},lead:{name:'🎹 Melodie',color:'#9a87ff'}
   };
   const modeConfig={
@@ -237,8 +239,8 @@ lead: x--x--x-</textarea>
     const snapshot=Object.fromEntries(cfg.tracks.map(k=>[k,patterns[k].slice(0,cfg.steps)]));
     try{const sr=22050,ctx=new OfflineAudioContext(1,Math.ceil((cfg.steps*dur+.35)*sr),sr),out=ctx.createGain();out.gain.value=.6;out.connect(ctx.destination);
       for(let step=0;step<cfg.steps;step++)for(const key of cfg.tracks)if(snapshot[key][step])scheduleNote(ctx,out,step*dur,key,step,dur);
-      const buffer=await ctx.startRendering(),map=await analyze(buffer);
-      if(revision===shapeRevision){audioBuffer=buffer;spectral=map;rebuild();$('playBtn').disabled=false;$('fileStatus').textContent='Live-Loop · '+mode+' · '+bpm+' BPM';$('analysisBadge').textContent='● LIVE · '+mode.toUpperCase();$('analysisBadge').dataset.revision=revision;}
+      const buffer=await ctx.startRendering(),map=await analyze(buffer),empty=!Object.values(snapshot).some(row=>row.some(Boolean));
+      if(revision===shapeRevision){audioBuffer=buffer;spectral=map;labShape={patterns:snapshot,steps:cfg.steps,empty};rebuild();$('playBtn').disabled=empty;$('fileStatus').textContent=empty?'Leeres Pattern · glatte Kuppel':'Live-Loop · '+mode+' · '+bpm+' BPM';$('analysisBadge').textContent=empty?'● LIVE · GLATTE KUPPEL':'● LIVE · '+mode.toUpperCase();$('analysisBadge').dataset.revision=revision;}
     }catch(err){console.error(err);showToast('Live-Form konnte nicht aktualisiert werden');}
     finally{patternRendering=false;if(revision!==shapeRevision){clearTimeout(shapeTimer);shapeTimer=setTimeout(updateLiveShape,0);}else $('exportBtn').disabled=false;}
   }
@@ -290,6 +292,10 @@ lead: x--x--x-</textarea>
     // Coordinates are normalized to the print footprint; Gaussian joins stay continuous.
     const scattered=(count,offset)=>Array.from({length:count},(_,k)=>{const a=k*2.399963+offset,r=.93*Math.sqrt((k+.5)/count);return{x:r*Math.cos(a),z:r*Math.sin(a),width:.06+(k%3)*.017,strength:.3+sampleMap(map,k/count,.25+(k%3)*.25)*1.8};});
     const peaks=scattered(29,.6),domes=scattered(22,2.1),motifs=scattered(13,0);
+    const patternEvents=(key,offset=0)=>{if(!labShape||!labShape.patterns[key])return[];const row=labShape.patterns[key],n=row.length;return row.flatMap((on,k)=>{if(!on)return[];const a=(k/n)*Math.PI*2+offset,r=.2+.67*((k*.61803398875+offset*.13)%1);return[{x:r*Math.cos(a),z:r*Math.sin(a),width:.12+(k%3)*.018,step:k/n}];});};
+    const kickEvents=patternEvents('kick',.25),snareEvents=patternEvents('snare',1.2),leadEvents=patternEvents('lead',2.3);
+    const presence=key=>labShape&&labShape.patterns[key]&&labShape.patterns[key].some(Boolean)?1:0;
+    const bassOn=presence('bass'),hatOn=presence('hat');
     // A single shared pole keeps the STL topologically watertight.
     const poleRadius=radius;
     pos.push(0,poleRadius,0);col.push(cHi.r,cHi.g,cHi.b);maxY=poleRadius;
@@ -318,7 +324,20 @@ lead: x--x--x-</textarea>
         }
         const basin=state.valleys/100*(trenches*2.3-(1-e)*.5);
         const bumps=state.texture/100*(rounds*2.6+(.2+high)*Math.pow(Math.max(0,Math.cos(px*110)*Math.cos(pz*110)),2)*.65);
-        const displacement=state.relief*envelope*(e*.2+ribbons+mountains*(.5+e+onset)*1.7+basin+bumps+snails*state.spirals/100*3.8+ringsField*state.circles/100*2.5);
+        let displacement;
+        if(labShape){
+          if(labShape.empty)displacement=0;
+          else{
+            // Broad footprints and capped summits avoid fragile needles and steep overhangs.
+            let kickPlateaus=0,snareRings=0,leadSpirals=0;
+            for(const p of kickEvents){const d=Math.hypot(px-p.x,pz-p.z)/p.width,edge=Math.max(0,Math.min(1,(d-.48)/1.18)),falloff=1-edge*edge*(3-2*edge);kickPlateaus+=falloff*(1.15+state.sharpness*.45);}
+            for(const p of snareEvents){const dx=px-p.x,dz=pz-p.z,d=Math.hypot(dx,dz),mask=Math.exp(-Math.pow(d/(p.width*2.05),4));snareRings+=mask*(Math.exp(-Math.pow((d-p.width*.78)/(p.width*.2),2))*1.35-Math.exp(-Math.pow(d/(p.width*.52),2))*.9);}
+            for(const p of leadEvents){const dx=px-p.x,dz=pz-p.z,d=Math.hypot(dx,dz),a=Math.atan2(dz,dx),mask=Math.exp(-Math.pow(d/(p.width*2.15),4)),core=1-Math.exp(-Math.pow(d/(p.width*.3),2));leadSpirals+=mask*core*(Math.pow(.5+.5*Math.cos(d*54-a*2),2)-.23);}
+            const bassWaves=bassOn*(Math.pow(.5+.5*Math.sin((pz+.16*Math.sin(px*4.5))*31),2.2)-.28)*state.ridges/100*2.15;
+            const hatGrooves=hatOn*(Math.pow(.5+.5*Math.sin(angle*18+theta*25),3)-.34)*state.texture/100*.95;
+            displacement=state.relief*envelope*(kickPlateaus*1.8+snareRings*state.circles/100*1.8+bassWaves+hatGrooves+leadSpirals*state.spirals/100*2.8);
+          }
+        }else displacement=state.relief*envelope*(e*.2+ribbons+mountains*(.5+e+onset)*1.7+basin+bumps+snails*state.spirals/100*3.8+ringsField*state.circles/100*2.5);
         const x=radius*Math.sin(theta)*Math.cos(angle),y=Math.max(0,radius*Math.cos(theta)+displacement),z=radius*Math.sin(theta)*Math.sin(angle);
         pos.push(x,y,z);maxY=Math.max(maxY,y);
         if(v<.45)c.copy(cHi).lerp(cMid,v/.45);else c.copy(cMid).lerp(cLow,(v-.45)/.55);
@@ -369,7 +388,7 @@ lead: x--x--x-</textarea>
     $('progress').style.display='block';$('progress').firstElementChild.style.width='5%';$('fileStatus').textContent='Audio wird gelesen …';
     try{audioCtx=audioCtx||new(window.AudioContext||window.webkitAudioContext)();const data=await file.arrayBuffer();audioBuffer=await audioCtx.decodeAudioData(data.slice(0));
       if(audioBuffer.duration>300)throw new Error('Bitte ein Musikstück mit maximal 5 Minuten verwenden.');
-      $('fileStatus').textContent='Klang wird analysiert …';spectral=await analyze(audioBuffer);rebuild();$('fileStatus').textContent=file.name+' · '+formatTime(audioBuffer.duration);$('analysisBadge').textContent='● ANALYSE · '+file.name.toUpperCase();$('playBtn').disabled=false;showToast('Musik erfolgreich in Form übersetzt');
+      $('fileStatus').textContent='Klang wird analysiert …';spectral=await analyze(audioBuffer);labShape=null;rebuild();$('fileStatus').textContent=file.name+' · '+formatTime(audioBuffer.duration);$('analysisBadge').textContent='● ANALYSE · '+file.name.toUpperCase();$('playBtn').disabled=false;showToast('Musik erfolgreich in Form übersetzt');
     }catch(err){console.error(err);$('fileStatus').textContent='Datei konnte nicht analysiert werden';showToast(err.message||'Dieses Audioformat wird nicht unterstützt');}
     finally{setTimeout(()=>{$('progress').style.display='none';},500);}
   }
@@ -405,7 +424,7 @@ lead: x--x--x-</textarea>
   for(const id of ['randomPattern','clearPattern'])$(id).addEventListener('click',queueLiveShape);
   document.querySelectorAll('.mode-tab').forEach(tab=>tab.addEventListener('click',queueLiveShape));
   document.addEventListener('visibilitychange',()=>{if(document.hidden)stopAudio();});
-  $('demoBtn').addEventListener('click',()=>{stopAudio();audioBuffer=null;$('playBtn').disabled=true;spectral=makeDemo(++demoSeed);rebuild();$('fileStatus').textContent='Neues Demo-Klangmuster ist aktiv';$('analysisBadge').textContent='● DEMO · SYNTHETISCHE KLANGDATEN';showToast('Neue Demoform erzeugt');});
+  $('demoBtn').addEventListener('click',()=>{stopAudio();audioBuffer=null;labShape=null;$('playBtn').disabled=true;spectral=makeDemo(++demoSeed);rebuild();$('fileStatus').textContent='Neues Demo-Klangmuster ist aktiv';$('analysisBadge').textContent='● DEMO · SYNTHETISCHE KLANGDATEN';showToast('Neue Demoform erzeugt');});
   const drop=$('dropZone');for(const ev of['dragenter','dragover'])drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('drag')});for(const ev of['dragleave','drop'])drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('drag')});drop.addEventListener('drop',e=>loadAudio(e.dataTransfer.files[0]));
 
   // Dependency-free virtual trackball: full X/Y/Z rotation, pinch zoom and two-finger roll.

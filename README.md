@@ -6,6 +6,8 @@ Eine kostenlose, iPad-taugliche Web-App für den MINT-Unterricht. Musik wird lok
 
 Ab Version 1.0.2 spielt „Play · Live“ den Rhythmus als laufenden Loop. Klangfelder, Tempo, Modus und Pattern-Code werden während der Wiedergabe übernommen. Die 3D-Form wird nach Änderungen automatisch aus einem neu gerenderten Loop analysiert (kurze Berechnungsverzögerung). Der STL-Export wartet auf die aktuelle Form.
 
+Ab Version 1.4.0 besitzt jedes Instrument eine eigene Formensprache: Bassdrum erzeugt breite Plateauberge, Snare Ringmulden, Hi-Hat feine Riefen, Bass großflächige Wellen und Melodie Schneckenspiralen. Ein vollständig leeres Pattern erzeugt eine glatte Kuppel. Gipfel sind bewusst abgeflacht und mit breiten, kontinuierlichen Flanken für den 3D-Druck ausgelegt.
+
 Schülerinnen und Schüler können Musik jetzt direkt in KlangKuppel erstellen und ohne Datei-Export in eine 3D-Form verwandeln:
 
 - **Entdecken (7–10):** acht große Schritte und vier farbige Klangspuren
