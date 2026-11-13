@@ -87,7 +87,7 @@
 <body>
 <div class="app">
   <header>
-    <div class="brand"><div class="brand-mark" aria-hidden="true"></div><div>KlangKuppel<small>Music → Matter Lab · v1.9.1</small></div></div>
+    <div class="brand"><div class="brand-mark" aria-hidden="true"></div><div>KlangKuppel<small>Music → Matter Lab · v1.9.2</small></div></div>
     <div class="header-note">Alles bleibt auf diesem Gerät</div>
   </header>
   <main>
@@ -254,12 +254,12 @@ lead: x--x--x-</textarea>
     const cfg=modeConfig[activeMode],dur=60/+$('tempo').value/4;
     while(nextTime<audioCtx.currentTime+.04){const step=nextStep%cfg.steps;
       for(const key of cfg.tracks)if(patterns[key][step])scheduleNote(audioCtx,labOutput,nextTime,key,step,dur);
-      triggerFluidStep(step,cfg);
-      timelineFocus=step/cfg.steps;updateTimelineLabel();
-      document.querySelectorAll('.step').forEach(b=>b.classList.toggle('playing',+b.dataset.step===step));
+      pendingVisualBeats.push({step,time:nextTime,steps:cfg.steps});
       nextStep++;nextTime+=dur;
     }
   }
+  const pendingVisualBeats=[];
+  function updateBeatVisual(){if(!labPlaying||!audioCtx)return;let beat;while(pendingVisualBeats.length&&pendingVisualBeats[0].time<=audioCtx.currentTime)beat=pendingVisualBeats.shift();if(!beat)return;timelineFocus=beat.step/beat.steps;updateTimelineLabel();triggerFluidStep(beat.step,modeConfig[activeMode]);document.querySelectorAll('.step').forEach(b=>b.classList.toggle('playing',+b.dataset.step===beat.step));if(labShape)rebuild();}
   async function startLab(){
     stopAudio();
     try{await unlockAudio();if(audioCtx.state!=='running')throw new Error('Audio ist auf diesem Gerät noch gesperrt. Bitte erneut auf Play tippen.');
@@ -335,7 +335,7 @@ lead: x--x--x-</textarea>
     // Distinct spatial motifs, with fixed placement and audio-dependent strength.
     // Coordinates are normalized to the print footprint; Gaussian joins stay continuous.
     const scattered=(count,offset)=>Array.from({length:count},(_,k)=>{const a=k*2.399963+offset,r=.93*Math.sqrt((k+.5)/count);return{x:r*Math.cos(a),z:r*Math.sin(a),width:.06+(k%3)*.017,strength:.3+sampleMap(map,k/count,.25+(k%3)*.25)*1.8};});
-    const peaks=scattered(29,.6),domes=scattered(22,2.1),motifs=scattered(13,0);
+    const peaks=labShape?[]:scattered(29,.6),domes=labShape?[]:scattered(22,2.1),motifs=labShape?[]:scattered(13,0);
     // The selected beat controls five deliberately different, print-safe shape languages.
     // They cover the whole dome where appropriate, so a single active instrument remains recognizable.
     const selectedBeat=labShape?Math.min(labShape.steps-1,Math.floor(timelineFocus*labShape.steps)):0;
@@ -385,9 +385,9 @@ lead: x--x--x-</textarea>
             // Bass: low, long wave valleys create a clearly different, flowing surface.
             const bassWaves=bassOn*(Math.sin((pz*4.2+px*2.4)*Math.PI+beatPhase)+.38*Math.sin((pz*2.05-px*.9)*Math.PI-beatPhase*1.4))*.5*state.ridges/100*1.55;
             // Melody: two continuous, grooved spirals sweep around the dome instead of isolated marks.
-            const spiralPhase=angle*2.25-Math.hypot(px,pz)*22+beatPhase*1.7;
+            const spiralPhase=angle*2-Math.hypot(px,pz)*22+beatPhase*1.7;
             const leadSpirals=leadOn*(Math.pow(.5+.5*Math.cos(spiralPhase),7)-.16)*state.spirals/100*1.65;
-            const melodyRills=leadOn*(Math.pow(.5+.5*Math.cos(spiralPhase*2.15+theta*8),5)-.21)*state.ridges/100*.72;
+            const melodyRills=leadOn*(Math.pow(.5+.5*Math.cos(spiralPhase*2+theta*8),5)-.21)*state.ridges/100*.72;
             displacement=state.relief*envelope*(kickPlateaus*1.52+snareRings*state.circles/100*1.64+hatGrooves+bassWaves+leadSpirals+melodyRills);
           }
         }else displacement=state.relief*envelope*(e*.2+ribbons+mountains*(.5+e+onset)*1.7+basin+bumps+snails*state.spirals/100*3.8+ringsField*state.circles/100*2.5);
@@ -450,10 +450,11 @@ lead: x--x--x-</textarea>
   function updateTimelineLabel(){const slider=$('timeline');if(labShape){const steps=labShape.steps,beat=Math.min(steps-1,Math.floor(timelineFocus*steps));slider.min=0;slider.max=steps-1;slider.step=1;slider.value=beat;$('timelineOut').textContent='Beat '+(beat+1)+' / '+steps;return;}slider.min=0;slider.max=1000;slider.step=1;slider.value=Math.round(timelineFocus*1000);$('timelineOut').textContent=audioBuffer?formatTime(timelineFocus*audioBuffer.duration)+' / '+formatTime(audioBuffer.duration):'Demo · '+Math.round(timelineFocus*100)+' %';}
   function setTimelineFocus(value,rebuildNow=false){timelineFocus=Math.max(0,Math.min(1,value));updateTimelineLabel();if(rebuildNow)rebuild();else if(!timelineRaf)timelineRaf=requestAnimationFrame(()=>{timelineRaf=0;rebuild();});}
   function playUploadedAt(offset){if(!audioBuffer)return;if(source){source.onended=null;try{source.stop()}catch(e){}}source=audioCtx.createBufferSource();const gain=audioCtx.createGain();gain.gain.value=masterVolume;source.buffer=audioBuffer;source.connect(gain);connectAudioAnalysis(gain);audioOffset=Math.max(0,Math.min(audioBuffer.duration-.01,offset));audioStartedAt=audioCtx.currentTime;source.onended=()=>{source=null;playing=false;audioOffset=0;setFluidActive(false);$('playBtn').textContent='▶ Anhören';$('listenPattern').textContent='▶ Play · Live';};source.start(0,audioOffset);}
-  function stopAudio(){labPlaying=false;clearInterval(labTimer);if(labOutput){labOutput.disconnect();labOutput=null;}document.querySelectorAll('.step.playing').forEach(b=>b.classList.remove('playing'));if(source){if(audioBuffer&&audioStartedAt)audioOffset=Math.min(audioBuffer.duration,audioOffset+audioCtx.currentTime-audioStartedAt);source.onended=null;try{source.stop()}catch(e){}source=null;}playing=false;fluidPulse=0;setFluidActive(false);$('playBtn').textContent='▶ Anhören';$('listenPattern').textContent='▶ Play · Live';}
-  async function toggleAudio(){if(playing){stopAudio();return;}if(!audioBuffer){showToast('Noch keine Musik zum Abspielen');return;}try{await unlockAudio();playUploadedAt(audioOffset);playing=true;setFluidActive(true);$('playBtn').textContent='■ Stoppen';$('listenPattern').textContent='■ Stoppen · Ton läuft';$('analysisBadge').textContent='● FLÜSSIGE KUPPEL · AUDIO';}catch(err){console.error(err);showToast(err.message||'Ton konnte nicht gestartet werden');}}
+  function stopAudio(){labPlaying=false;pendingVisualBeats.length=0;clearInterval(labTimer);if(labOutput){labOutput.disconnect();labOutput=null;}document.querySelectorAll('.step.playing').forEach(b=>b.classList.remove('playing'));if(source){if(audioBuffer&&audioStartedAt)audioOffset=Math.min(audioBuffer.duration,audioOffset+audioCtx.currentTime-audioStartedAt);source.onended=null;try{source.stop()}catch(e){}source=null;}playing=false;fluidPulse=0;audioEnergy=0;setFluidActive(false);$('playBtn').textContent='▶ Anhören';$('listenPattern').textContent='▶ Play · Live';}
+  async function toggleAudio(){if(playing){stopAudio();return;}if(labShape){await startLab();return;}if(!audioBuffer){showToast('Noch keine Musik zum Abspielen');return;}try{await unlockAudio();playUploadedAt(audioOffset);playing=true;setFluidActive(true);$('playBtn').textContent='■ Stoppen';$('listenPattern').textContent='■ Stoppen · Ton läuft';$('analysisBadge').textContent='● FLÜSSIGE KUPPEL · AUDIO';}catch(err){console.error(err);showToast(err.message||'Ton konnte nicht gestartet werden');}}
 
   function exportSTL(){
+    stopAudio();rebuild();
     if(!mesh)return;const g=mesh.geometry,index=g.index,position=g.attributes.position,tri=index.count/3,buffer=new ArrayBuffer(84+tri*50),view=new DataView(buffer);const header='KlangKuppel · 80mm · watertight';for(let i=0;i<header.length;i++)view.setUint8(i,header.charCodeAt(i));view.setUint32(80,tri,true);let o=84;
     const a=new THREE.Vector3(),b=new THREE.Vector3(),c=new THREE.Vector3(),n=new THREE.Vector3();
     for(let i=0;i<index.count;i+=3){a.fromBufferAttribute(position,index.getX(i));b.fromBufferAttribute(position,index.getX(i+1));c.fromBufferAttribute(position,index.getX(i+2));for(const v of[a,b,c])v.set(v.x,-v.z,v.y+state.baseHeight);n.subVectors(b,a).cross(new THREE.Vector3().subVectors(c,a)).normalize();for(const v of[n,a,b,c]){view.setFloat32(o,v.x,true);view.setFloat32(o+4,v.y,true);view.setFloat32(o+8,v.z,true);o+=12;}view.setUint16(o,0,true);o+=2;}
@@ -486,7 +487,7 @@ lead: x--x--x-</textarea>
   $('audioFile').addEventListener('change',e=>loadAudio(e.target.files[0]));$('playBtn').addEventListener('click',()=>{try{unlockAudio().catch(()=>{});}catch(err){showToast(err.message);}toggleAudio();});$('exportBtn').addEventListener('click',exportSTL);
   document.querySelectorAll('.mode-tab').forEach(tab=>tab.addEventListener('click',()=>{activeMode=tab.dataset.mode;document.querySelectorAll('.mode-tab').forEach(t=>{t.classList.toggle('active',t===tab);t.setAttribute('aria-selected',t===tab?'true':'false');});if(activeMode==='code')syncCodeFromPattern();renderSequencer();scheduleSaveProject();showToast('Modus: '+activeModeLabel());}));
   $('tempo').addEventListener('input',e=>{$('tempoOut').textContent=e.target.value+' BPM';scheduleSaveProject();});
-  $('timeline').addEventListener('input',e=>{const position=labShape?+e.target.value/labShape.steps:+e.target.value/1000;setTimelineFocus(position);scheduleSaveProject();});
+  $('timeline').addEventListener('input',e=>{const position=labShape?+e.target.value/labShape.steps:+e.target.value/1000;stopAudio();setTimelineFocus(position);scheduleSaveProject();});
   $('timeline').addEventListener('change',e=>{const position=labShape?+e.target.value/labShape.steps:+e.target.value/1000;timelineFocus=position;updateTimelineLabel();if(labPlaying||labShape){const cfg=modeConfig[activeMode];nextStep=Math.floor(position*cfg.steps);if(labPlaying)nextTime=audioCtx.currentTime+.02;rebuild();showToast('Beat '+(nextStep+1)+' ist für STL ausgewählt');}else if(audioBuffer){audioOffset=position*audioBuffer.duration;if(playing)playUploadedAt(audioOffset);showToast('Songposition: '+formatTime(audioOffset));}scheduleSaveProject();});
   $('volume').addEventListener('input',e=>{masterVolume=+e.target.value/100;$('volumeOut').textContent=e.target.value+' %';if(labOutput&&audioCtx)labOutput.gain.setTargetAtTime(masterVolume,audioCtx.currentTime,.015);scheduleSaveProject();});
   $('randomPattern').addEventListener('click',()=>{const cfg=modeConfig[activeMode];for(const key of cfg.tracks)for(let i=0;i<cfg.steps;i++){const density=key==='hat'?.48:key==='kick'?.28:.2;patterns[key][i]=Math.random()<density;}if(activeMode==='code')syncCodeFromPattern();renderSequencer();});
@@ -522,7 +523,7 @@ lead: x--x--x-</textarea>
   $('fluidDome').addEventListener('click',()=>{fluidOn=!fluidOn;$('fluidDome').classList.toggle('active',fluidOn);$('fluidDome').setAttribute('aria-pressed',String(fluidOn));setFluidActive(playing);showToast(fluidOn?'Flüssige Kuppel an':'Flüssige Kuppel aus');});
   function resize(){const r=canvas.getBoundingClientRect();if(!r.width||!r.height)return;renderer.setSize(r.width,r.height,false);camera.aspect=r.width/r.height;camera.updateProjectionMatrix();setCamera();}
   new ResizeObserver(resize).observe(canvas);setCamera();renderSequencer();rebuild();restoreSavedProject();
-  function animate(time){requestAnimationFrame(animate);if(mesh&&autoSpin&&!pointers.size)modelGroup.rotateY(.0022);if(playing&&source&&audioBuffer&&audioStartedAt){const position=Math.min(.999,(audioOffset+audioCtx.currentTime-audioStartedAt)/audioBuffer.duration);timelineFocus=position;updateTimelineLabel();if(!animate.lastModelUpdate||time-animate.lastModelUpdate>700){animate.lastModelUpdate=time;rebuild();}}updateAudioAnalysis(time);updateFluidDome(time);renderer.render(scene,camera);}animate();
+  function animate(time){requestAnimationFrame(animate);if(mesh&&autoSpin&&!pointers.size)modelGroup.rotateY(.0022);updateBeatVisual();if(playing&&source&&audioBuffer&&audioStartedAt){const position=Math.min(.999,(audioOffset+audioCtx.currentTime-audioStartedAt)/audioBuffer.duration);timelineFocus=position;updateTimelineLabel();if(!animate.lastModelUpdate||time-animate.lastModelUpdate>100){animate.lastModelUpdate=time;rebuild();}}updateAudioAnalysis(time);updateFluidDome(time);renderer.render(scene,camera);}animate();
 })();
 </script>
 </body>
