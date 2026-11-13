@@ -87,7 +87,7 @@
 <body>
 <div class="app">
   <header>
-    <div class="brand"><div class="brand-mark" aria-hidden="true"></div><div>KlangKuppel<small>Music → Matter Lab · v1.9.2</small></div></div>
+    <div class="brand"><div class="brand-mark" aria-hidden="true"></div><div>KlangKuppel<small>Music → Matter Lab · v1.10.0</small></div></div>
     <div class="header-note">Alles bleibt auf diesem Gerät</div>
   </header>
   <main>
@@ -120,7 +120,7 @@ lead: x--x--x-</textarea>
         </div>
         <div class="tempo" style="margin-top:8px"><label for="volume"><span>Lautstärke</span><b id="volumeOut">85 %</b></label><input id="volume" type="range" min="0" max="100" value="85" step="1"></div>
         <div class="lab-actions"><button class="btn" id="listenPattern">▶ Play · Live</button><button class="btn make" id="makeForm">↻ 3D aktualisieren</button></div>
-        <p class="mode-help" style="margin:9px 0 0">Play wiederholt deinen Loop. Die Kuppel wird dabei zu einer flüssigen, beatgetriebenen Live-Hülle. Diese Bewegung wird nicht in die STL exportiert.</p>
+        <p class="mode-help" style="margin:9px 0 0">Play wiederholt deinen Loop. Die Instrumentformen verschmelzen pro Beat zu einer gemeinsamen, fließenden Live-Hülle. Der gewählte Beat wird als druckbare Form exportiert.</p>
       </section>
 
       <div class="drop" id="dropZone">
@@ -225,10 +225,10 @@ lead: x--x--x-</textarea>
   const state={relief:6,sharpness:.55,smooth:.35,ridges:70,valleys:60,texture:45,spirals:85,circles:80,detail:1,baseHeight:2.4,mirror:false,wire:false};
   const mat=new THREE.MeshStandardMaterial({color:0xeee9e0,roughness:.72,metalness:0,vertexColors:false,side:THREE.FrontSide});
   const fluidMaterial=new THREE.MeshStandardMaterial({color:0x8b7cff,emissive:0x20153b,emissiveIntensity:.48,roughness:.28,metalness:.08,transparent:true,opacity:.96,side:THREE.FrontSide});
-  let liveSkin=null,liveSkinBase=null,lastFluidFrame=0,fluidPulse=0,fluidOn=true;
-  function prepareFluidSkin(){if(liveSkin){modelGroup.remove(liveSkin);liveSkin.geometry.dispose();liveSkin=null;}if(!mesh)return;const skinGeometry=mesh.geometry.clone();liveSkinBase=new Float32Array(skinGeometry.attributes.position.array);liveSkin=new THREE.Mesh(skinGeometry,fluidMaterial);liveSkin.position.copy(mesh.position);liveSkin.visible=false;modelGroup.add(liveSkin);}
+  let liveSkin=null,liveSkinBase=null,liveSkinTarget=null,liveSkinMorphFrom=null,liveSkinMorphStart=0,liveSkinMorphDuration=180,lastFluidFrame=0,fluidPulse=0,fluidOn=true;
+  function prepareFluidSkin(previousBase=null){if(liveSkin){modelGroup.remove(liveSkin);liveSkin.geometry.dispose();liveSkin=null;}if(!mesh)return;const skinGeometry=mesh.geometry.clone();liveSkinTarget=new Float32Array(skinGeometry.attributes.position.array);const canMorph=playing&&previousBase?.length===liveSkinTarget.length;if(canMorph){liveSkinMorphFrom=new Float32Array(previousBase);liveSkinBase=new Float32Array(previousBase);skinGeometry.attributes.position.array.set(previousBase);liveSkinMorphStart=performance.now();const stepMs=60000/(+$('tempo').value||100)/4;liveSkinMorphDuration=Math.max(90,Math.min(260,stepMs*.82));}else{liveSkinMorphFrom=null;liveSkinBase=new Float32Array(liveSkinTarget);}liveSkin=new THREE.Mesh(skinGeometry,fluidMaterial);liveSkin.position.copy(mesh.position);liveSkin.visible=false;modelGroup.add(liveSkin);}
   function setFluidActive(active){if(!mesh||!liveSkin)return;const visible=active&&fluidOn;liveSkin.visible=visible;mesh.visible=!visible;}
-  function updateFluidDome(time){if(!liveSkin||!liveSkinBase||!playing||!fluidOn)return;if(time-lastFluidFrame<32)return;lastFluidFrame=time;const energy=audioEnergy,positions=liveSkin.geometry.attributes.position.array,phase=time*.0034,pulse=fluidPulse;fluidPulse*=.91;for(let i=0;i<positions.length;i+=3){const x=liveSkinBase[i],y=liveSkinBase[i+1],z=liveSkinBase[i+2],r=Math.hypot(x,z),a=Math.atan2(z,x),skin=Math.max(0,1-r/40)*Math.max(0,Math.min(1,(y+state.baseHeight)/14));const flow=Math.sin(a*4+r*.38-phase)+.58*Math.sin(a*7-r*.24+phase*1.7)+.35*Math.cos(r*.74-phase*1.3);const lift=(flow*(.5+energy*2.6)+Math.sin(r*.42-phase*2.2)*pulse*2.6)*skin;positions[i]=x+Math.cos(a)*lift*.16;positions[i+1]=y+lift;positions[i+2]=z+Math.sin(a)*lift*.16;}liveSkin.geometry.attributes.position.needsUpdate=true;liveSkin.geometry.computeVertexNormals();const hue=.67+.06*Math.sin(phase*.55+energy*4);fluidMaterial.color.setHSL(hue,.56,.66);fluidMaterial.emissive.setHSL(hue,.48,.14+energy*.13);}
+  function updateFluidDome(time){if(!liveSkin||!liveSkinBase||!playing||!fluidOn)return;if(time-lastFluidFrame<32)return;lastFluidFrame=time;if(liveSkinMorphFrom&&liveSkinTarget){const raw=Math.min(1,(time-liveSkinMorphStart)/liveSkinMorphDuration),blend=raw*raw*(3-2*raw);for(let i=0;i<liveSkinBase.length;i++)liveSkinBase[i]=liveSkinMorphFrom[i]+(liveSkinTarget[i]-liveSkinMorphFrom[i])*blend;if(raw===1)liveSkinMorphFrom=null;}const energy=audioEnergy,positions=liveSkin.geometry.attributes.position.array,phase=time*.0034,pulse=fluidPulse;fluidPulse*=.91;for(let i=0;i<positions.length;i+=3){const x=liveSkinBase[i],y=liveSkinBase[i+1],z=liveSkinBase[i+2],r=Math.hypot(x,z),a=Math.atan2(z,x),skin=Math.max(0,1-r/40)*Math.max(0,Math.min(1,(y+state.baseHeight)/14));const flow=Math.sin(a*4+r*.38-phase)+.58*Math.sin(a*7-r*.24+phase*1.7)+.35*Math.cos(r*.74-phase*1.3);const lift=(flow*(.5+energy*2.6)+Math.sin(r*.42-phase*2.2)*pulse*2.6)*skin;positions[i]=x+Math.cos(a)*lift*.16;positions[i+1]=y+lift;positions[i+2]=z+Math.sin(a)*lift*.16;}liveSkin.geometry.attributes.position.needsUpdate=true;liveSkin.geometry.computeVertexNormals();const hue=.67+.06*Math.sin(phase*.55+energy*4);fluidMaterial.color.setHSL(hue,.56,.66);fluidMaterial.emissive.setHSL(hue,.48,.14+energy*.13);}
   const tracks={
     kick:{name:'🥁 Bassdrum',color:'#ff704c'},snare:{name:'👏 Snare',color:'#ffb84d'},hat:{name:'✨ Hi-Hat',color:'#b7f34b'},
     bass:{name:'🎸 Bass',color:'#48d7c8'},lead:{name:'🎹 Melodie',color:'#9a87ff'}
@@ -341,6 +341,7 @@ lead: x--x--x-</textarea>
     const selectedBeat=labShape?Math.min(labShape.steps-1,Math.floor(timelineFocus*labShape.steps)):0;
     const presence=key=>labShape?.patterns[key]?.[selectedBeat]?1:0;
     const kickOn=presence('kick'),snareOn=presence('snare'),hatOn=presence('hat'),bassOn=presence('bass'),leadOn=presence('lead');
+    const ensembleCount=kickOn+snareOn+hatOn+bassOn+leadOn;
     // A single shared pole keeps the STL topologically watertight.
     const poleRadius=radius;
     pos.push(0,poleRadius,0);col.push(cHi.r,cHi.g,cHi.b);maxY=poleRadius;
@@ -388,7 +389,13 @@ lead: x--x--x-</textarea>
             const spiralPhase=angle*2-Math.hypot(px,pz)*22+beatPhase*1.7;
             const leadSpirals=leadOn*(Math.pow(.5+.5*Math.cos(spiralPhase),7)-.16)*state.spirals/100*1.65;
             const melodyRills=leadOn*(Math.pow(.5+.5*Math.cos(spiralPhase*2+theta*8),5)-.21)*state.ridges/100*.72;
-            displacement=state.relief*envelope*(kickPlateaus*1.52+snareRings*state.circles/100*1.64+hatGrooves+bassWaves+leadSpirals+melodyRills);
+            // Ensemble interactions join the individual motifs into one coherent relief.
+            const sharedFlow=ensembleCount>1?(Math.sin(angle*2-Math.hypot(px,pz)*11+beatPhase)*.5+.5*Math.cos(theta*5+beatPhase))*Math.min(1,(ensembleCount-1)/3)*.34:0;
+            const kickBassBridge=kickOn*bassOn*cappedHill(.38*Math.cos(beatPhase),.38*Math.sin(beatPhase),.46)*bassWaves*.48;
+            const snareLeadWeave=snareOn*leadOn*snareMask*Math.cos(spiralPhase)*.36;
+            const hatContour=hatOn*Math.min(1,kickOn+snareOn+bassOn+leadOn)*(Math.pow(.5+.5*Math.cos(spiralPhase+angle*6),4)-.24)*.24;
+            const ensembleScale=1/(1+Math.max(0,ensembleCount-1)*.13);
+            displacement=state.relief*envelope*ensembleScale*(kickPlateaus*1.52+snareRings*state.circles/100*1.64+hatGrooves+bassWaves+leadSpirals+melodyRills+sharedFlow+kickBassBridge+snareLeadWeave+hatContour);
           }
         }else displacement=state.relief*envelope*(e*.2+ribbons+mountains*(.5+e+onset)*1.7+basin+bumps+snails*state.spirals/100*3.8+ringsField*state.circles/100*2.5);
         const x=radius*Math.sin(theta)*Math.cos(angle),y=Math.max(0,radius*Math.cos(theta)+displacement),z=radius*Math.sin(theta)*Math.sin(angle);
@@ -415,7 +422,8 @@ lead: x--x--x-</textarea>
     maxY=40-state.baseHeight;
     for(let i=0;i<idx.length;i+=3)[idx[i+1],idx[i+2]]=[idx[i+2],idx[i+1]];
     const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));g.setIndex(idx);g.computeVertexNormals();g.computeBoundingSphere();
-    if(mesh){modelGroup.remove(mesh);mesh.geometry.dispose();} mesh=new THREE.Mesh(g,mat);mesh.position.y=-18;modelGroup.add(mesh);mat.wireframe=state.wire;prepareFluidSkin();setFluidActive(playing);
+    const previousLiveBase=playing&&liveSkinBase?new Float32Array(liveSkinBase):null;
+    if(mesh){modelGroup.remove(mesh);mesh.geometry.dispose();} mesh=new THREE.Mesh(g,mat);mesh.position.y=-18;modelGroup.add(mesh);mat.wireframe=state.wire;prepareFluidSkin(previousLiveBase);setFluidActive(playing);
     geometryInfo={triangles:idx.length/3,maxHeight:maxY+state.baseHeight};
     $('heightMetric').textContent=Math.round(geometryInfo.maxHeight)+' mm';$('triMetric').textContent=(geometryInfo.triangles/1000).toFixed(1).replace('.',',')+'k';
   }

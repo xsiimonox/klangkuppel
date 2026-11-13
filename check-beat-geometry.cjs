@@ -7,8 +7,8 @@ class Geometry{constructor(){this.attributes={};}setAttribute(k,v){this.attribut
 const context={THREE:{Color,BufferGeometry:Geometry,Float32BufferAttribute:class{constructor(a){this.array=a;}},Mesh:class{constructor(g){this.geometry=g;this.position={y:0};}}},state:{relief:6,sharpness:.55,smooth:.35,ridges:70,valleys:60,texture:45,spirals:85,circles:80,detail:0,baseHeight:2.4,mirror:false},spectral:Array.from({length:24},()=>Array(128).fill(.4)),labShape:null,timelineFocus:0,mesh:null,mat:{},modelGroup:{add(){},remove(){}},prepareFluidSkin(){},setFluidActive(){},playing:false,$:()=>({}),geometryInfo:null};
 vm.createContext(context);vm.runInContext(source,context);
 const hashes=new Set();
-for(const instrument of ['kick','snare','hat','bass','lead','empty']){
- context.labShape={steps:8,empty:instrument==='empty',patterns:Object.fromEntries(['kick','snare','hat','bass','lead'].map(k=>[k,Array.from({length:8},(_,i)=>k===instrument&&i===0)]))};
+for(const instrument of ['kick','snare','hat','bass','lead','ensemble','empty']){
+ context.labShape={steps:8,empty:instrument==='empty',patterns:Object.fromEntries(['kick','snare','hat','bass','lead'].map(k=>[k,Array.from({length:8},(_,i)=>(k===instrument||instrument==='ensemble')&&i===0)]))};
  context.timelineFocus=0;context.rebuild();
  const {attributes:{position:{array:p}},index:indices}=context.mesh.geometry;
  assert(p.every(Number.isFinite));
@@ -19,5 +19,5 @@ for(const instrument of ['kick','snare','hat','bass','lead','empty']){
  assert(silent.every(Number.isFinite));
  console.log(instrument+': finite, closed mesh; next beat generated');
 }
-assert.equal(hashes.size,6,'Every instrument has distinct geometry');
-console.log('PASS: five distinct instrument meshes plus smooth silence');
+assert.equal(hashes.size,7,'Every instrument and the ensemble have distinct geometry');
+console.log('PASS: five distinct instruments blend into a distinct ensemble plus smooth silence');
