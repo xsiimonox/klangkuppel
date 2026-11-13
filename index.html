@@ -84,7 +84,7 @@
 <body>
 <div class="app">
   <header>
-    <div class="brand"><div class="brand-mark" aria-hidden="true"></div><div>KlangKuppel<small>Music → Matter Lab · v1.2.0</small></div></div>
+    <div class="brand"><div class="brand-mark" aria-hidden="true"></div><div>KlangKuppel<small>Music → Matter Lab · v1.3.0</small></div></div>
     <div class="header-note">Alles bleibt auf diesem Gerät</div>
   </header>
   <main>
@@ -136,6 +136,8 @@ lead: x--x--x-</textarea>
         <div class="slider"><label for="ridges">Wellenrippen</label><output id="ridgesOut">70 %</output><input id="ridges" type="range" min="0" max="100" value="70"></div>
         <div class="slider"><label for="valleys">Mulden & Täler</label><output id="valleysOut">60 %</output><input id="valleys" type="range" min="0" max="100" value="60"></div>
         <div class="slider"><label for="texture">Fühlbare Textur</label><output id="textureOut">45 %</output><input id="texture" type="range" min="0" max="100" value="45"></div>
+        <div class="slider"><label for="spirals">Schneckenspiralen</label><output id="spiralsOut">85 %</output><input id="spirals" type="range" min="0" max="100" value="85"></div>
+        <div class="slider"><label for="circles">Kreise & Ringmulden</label><output id="circlesOut">80 %</output><input id="circles" type="range" min="0" max="100" value="80"></div>
         <p class="mode-help">Klanglandschaft: Lautstärke → Höhe · Klangwechsel → Berge · tiefe Klänge → Wellen · leise Stellen → Mulden. Künstlerische Übersetzung der Frequenzanalyse.</p>
         <div class="slider"><label for="detail">Detaildichte</label><output id="detailOut">Mittel</output><input id="detail" type="range" min="0" max="2" value="1" step="1"></div>
         <div class="slider"><label for="baseHeight">Bodenstärke</label><output id="baseOut">2,4 mm</output><input id="baseHeight" type="range" min="1.6" max="5" value="2.4" step="0.2"></div>
@@ -196,7 +198,7 @@ lead: x--x--x-</textarea>
 
   let mesh, audioBuffer=null, source=null, audioCtx=null, playing=false, demoSeed=2;
   let spectral=makeDemo(demoSeed), geometryInfo={triangles:0,maxHeight:46};
-  const state={relief:6,sharpness:.55,smooth:.35,ridges:70,valleys:60,texture:45,detail:1,baseHeight:2.4,mirror:false,wire:false};
+  const state={relief:6,sharpness:.55,smooth:.35,ridges:70,valleys:60,texture:45,spirals:85,circles:80,detail:1,baseHeight:2.4,mirror:false,wire:false};
   const mat=new THREE.MeshStandardMaterial({color:0xeee9e0,roughness:.72,metalness:0,vertexColors:false,side:THREE.FrontSide});
   const tracks={
     kick:{name:'🥁 Bass',color:'#ff704c'},snare:{name:'👏 Snare',color:'#ffb84d'},hat:{name:'✨ Hi-Hat',color:'#b7f34b'},
@@ -286,10 +288,8 @@ lead: x--x--x-</textarea>
     const cLow=new THREE.Color(0xff704c),cMid=new THREE.Color(0x8b7cff),cHi=new THREE.Color(0xb7f34b),c=new THREE.Color();
     // Distinct spatial motifs, with fixed placement and audio-dependent strength.
     // Coordinates are normalized to the print footprint; Gaussian joins stay continuous.
-    const peaks=Array.from({length:12},(_,k)=>({x:.12+(k%4)*.12,z:-.58+Math.floor(k/4)*.16,
-      width:.038+(k%3)*.009,strength:.35+sampleMap(map,k/12,.7)*1.8}));
-    const domes=Array.from({length:15},(_,k)=>({x:-.62+(k%5)*.21,z:.24+Math.floor(k/5)*.16,
-      width:.065+(k%3)*.014,strength:.2+sampleMap(map,k/15,.28)*1.5}));
+    const scattered=(count,offset)=>Array.from({length:count},(_,k)=>{const a=k*2.399963+offset,r=.93*Math.sqrt((k+.5)/count);return{x:r*Math.cos(a),z:r*Math.sin(a),width:.06+(k%3)*.017,strength:.3+sampleMap(map,k/count,.25+(k%3)*.25)*1.8};});
+    const peaks=scattered(29,.6),domes=scattered(22,2.1),motifs=scattered(13,0);
     // A single shared pole keeps the STL topologically watertight.
     const poleRadius=radius;
     pos.push(0,poleRadius,0);col.push(cHi.r,cHi.g,cHi.b);maxY=poleRadius;
@@ -300,23 +300,25 @@ lead: x--x--x-</textarea>
         const angle=u*Math.PI*2,low=sampleMap(map,u,.15),high=sampleMap(map,u,.8);
         const previous=sampleMap(map,u-1/128,1-v),onset=Math.max(0,e-previous);
         // Smooth height field over a fixed circular footprint: no detached features or undercuts.
-        const envelope=Math.pow(Math.sin(theta),1.2)*Math.pow(Math.cos(theta),.65);
+        const envelope=Math.pow(Math.sin(theta),.45)*Math.pow(Math.max(0,Math.cos(theta)),.3);
         const px=Math.sin(theta)*Math.cos(angle),pz=Math.sin(theta)*Math.sin(angle);
         const gauss=(cx,cz,wx,wz)=>Math.exp(-(((px-cx)/wx)**2+((pz-cz)/wz)**2));
-        const waveArea=gauss(-.43,-.12,.52,.38);
         const wavePhase=(pz+.13*Math.sin(px*7)+px*.3)*70;
-        const ribbons=waveArea*Math.pow(.5+.5*Math.sin(wavePhase),2.4)*(.3+low)*state.ridges/100*2.8;
+        const ribbons=(Math.pow(.5+.5*Math.sin(wavePhase),2.4)-.3)*(.35+low)*state.ridges/100*3.2;
         let mountains=0,rounds=0;
         for(const p of peaks){const d=Math.hypot(px-p.x,pz-p.z)/p.width;
           mountains+=Math.exp(-Math.pow(d,1.15+1.6*(1-state.sharpness)))*p.strength*(1+state.sharpness*2.4);}
         for(const p of domes)rounds+=gauss(p.x,p.z,p.width,p.width)*p.strength;
         // Off-center crater with concentric stepped rings; unlike the wave field this is localized.
-        const craterD=Math.hypot((px+.35)/1.1,pz+.51),craterMask=Math.exp(-Math.pow(craterD/.25,4));
-        const crater=craterMask*(-4.5*Math.exp(-Math.pow(craterD/.14,2))+.9*Math.sin(craterD*95));
-        const basin=state.valleys/100*crater*(.5+1-e);
-        const textureArea=gauss(.54,.12,.24,.28);
-        const bumps=state.texture/100*(rounds*4.5+textureArea*(.2+high)*Math.pow(Math.max(0,Math.cos(px*125)*Math.cos(pz*125)),2));
-        const displacement=state.relief*envelope*(e*.2+ribbons+mountains*(.5+e+onset)+basin+bumps);
+        let snails=0,ringsField=0,trenches=0;
+        for(let k=0;k<motifs.length;k++){const p=motifs[k],dx=px-p.x,dz=pz-p.z,d=Math.hypot(dx,dz),a=Math.atan2(dz,dx),mask=Math.exp(-Math.pow(d/.24,4)),core=1-Math.exp(-Math.pow(d/.045,2));
+          if(k%2===0)snails+=mask*core*(Math.pow(.5+.5*Math.cos(d*85-a*2),2)-.28)*(1+p.strength);
+          else ringsField+=mask*(Math.pow(.5+.5*Math.cos(d*100),3)*1.7-1.6*Math.exp(-Math.pow(d/.09,2)));
+          trenches-=mask*Math.exp(-Math.pow(d/.1,2));
+        }
+        const basin=state.valleys/100*(trenches*2.3-(1-e)*.5);
+        const bumps=state.texture/100*(rounds*2.6+(.2+high)*Math.pow(Math.max(0,Math.cos(px*110)*Math.cos(pz*110)),2)*.65);
+        const displacement=state.relief*envelope*(e*.2+ribbons+mountains*(.5+e+onset)*1.7+basin+bumps+snails*state.spirals/100*3.8+ringsField*state.circles/100*2.5);
         const x=radius*Math.sin(theta)*Math.cos(angle),y=Math.max(0,radius*Math.cos(theta)+displacement),z=radius*Math.sin(theta)*Math.sin(angle);
         pos.push(x,y,z);maxY=Math.max(maxY,y);
         if(v<.45)c.copy(cHi).lerp(cMid,v/.45);else c.copy(cMid).lerp(cLow,(v-.45)/.55);
@@ -388,6 +390,7 @@ lead: x--x--x-</textarea>
   bindSlider('relief','relief','reliefOut',v=>v.toFixed(1).replace('.',',')+' mm');
   bindSlider('sharpness','sharpness','sharpnessOut',v=>v+' %');bindSlider('smooth','smooth','smoothOut',v=>v+' %');
   bindSlider('ridges','ridges','ridgesOut',v=>v+' %');bindSlider('valleys','valleys','valleysOut',v=>v+' %');bindSlider('texture','texture','textureOut',v=>v+' %');
+  bindSlider('spirals','spirals','spiralsOut',v=>v+' %');bindSlider('circles','circles','circlesOut',v=>v+' %');
   bindSlider('detail','detail','detailOut',v=>['Grob','Mittel','Fein'][v]);bindSlider('baseHeight','baseHeight','baseOut',v=>v.toFixed(1).replace('.',',')+' mm');
   $('mirror').addEventListener('change',e=>{state.mirror=e.target.checked;rebuild();});$('wire').addEventListener('change',e=>{state.wire=e.target.checked;mat.wireframe=state.wire;});
   $('audioFile').addEventListener('change',e=>loadAudio(e.target.files[0]));$('playBtn').addEventListener('click',toggleAudio);$('exportBtn').addEventListener('click',exportSTL);
