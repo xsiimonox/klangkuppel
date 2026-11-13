@@ -87,7 +87,7 @@
 <body>
 <div class="app">
   <header>
-    <div class="brand"><div class="brand-mark" aria-hidden="true"></div><div>KlangKuppel<small>Music → Matter Lab · v1.9.0</small></div></div>
+    <div class="brand"><div class="brand-mark" aria-hidden="true"></div><div>KlangKuppel<small>Music → Matter Lab · v1.9.1</small></div></div>
     <div class="header-note">Alles bleibt auf diesem Gerät</div>
   </header>
   <main>
@@ -104,7 +104,7 @@
           <button class="mode-tab" data-mode="code" role="tab" aria-selected="false">ab 15<br>Coden</button>
         </div>
         <p class="mode-help" id="modeHelp">Tippe auf die bunten Felder: Jede Zeile ist ein Klang, jede Spalte ein Zeitpunkt.</p>
-        <div class="shape-key" aria-label="Zuordnung von Instrumenten zu Formen"><span><b>Bassdrum</b> Plateauberge</span><span><b>Snare</b> Ringmulden</span><span><b>Hi-Hat</b> Riefen</span><span><b>Bass</b> Wellen</span><span><b>Melodie</b> Spiralen & Rillen</span></div>
+        <div class="shape-key" aria-label="Zuordnung von Instrumenten zu Formen"><span><b>Bassdrum</b> Plateauberge</span><span><b>Snare</b> Krater-Ringe</span><span><b>Hi-Hat</b> dichte Radialriefen</span><span><b>Bass</b> breite Wellentäler</span><span><b>Melodie</b> Doppelspiralen</span></div>
         <div class="seq-wrap"><div class="sequencer" id="sequencer"></div></div>
         <div class="code-box" id="codeBox">
           <textarea id="patternCode" spellcheck="false" aria-label="Musikpattern als Code">kick: x---x---
@@ -336,10 +336,11 @@ lead: x--x--x-</textarea>
     // Coordinates are normalized to the print footprint; Gaussian joins stay continuous.
     const scattered=(count,offset)=>Array.from({length:count},(_,k)=>{const a=k*2.399963+offset,r=.93*Math.sqrt((k+.5)/count);return{x:r*Math.cos(a),z:r*Math.sin(a),width:.06+(k%3)*.017,strength:.3+sampleMap(map,k/count,.25+(k%3)*.25)*1.8};});
     const peaks=scattered(29,.6),domes=scattered(22,2.1),motifs=scattered(13,0);
-    const patternEvents=(key,offset=0)=>{if(!labShape||!labShape.patterns[key])return[];const row=labShape.patterns[key],n=row.length,beat=Math.min(n-1,Math.floor(timelineFocus*n));return row.flatMap((on,k)=>{if(!on||k!==beat)return[];const a=(k/n)*Math.PI*2+offset,r=.2+.67*((k*.61803398875+offset*.13)%1);return[{x:r*Math.cos(a),z:r*Math.sin(a),width:.12+(k%3)*.018,step:k/n}];});};
-    const kickEvents=patternEvents('kick',.25),snareEvents=patternEvents('snare',1.2),leadEvents=patternEvents('lead',2.3);
-    const presence=key=>{if(!labShape||!labShape.patterns[key])return 0;const beat=Math.min(labShape.steps-1,Math.floor(timelineFocus*labShape.steps));return labShape.patterns[key][beat]?1:0;};
-    const bassOn=presence('bass'),hatOn=presence('hat');
+    // The selected beat controls five deliberately different, print-safe shape languages.
+    // They cover the whole dome where appropriate, so a single active instrument remains recognizable.
+    const selectedBeat=labShape?Math.min(labShape.steps-1,Math.floor(timelineFocus*labShape.steps)):0;
+    const presence=key=>labShape?.patterns[key]?.[selectedBeat]?1:0;
+    const kickOn=presence('kick'),snareOn=presence('snare'),hatOn=presence('hat'),bassOn=presence('bass'),leadOn=presence('lead');
     // A single shared pole keeps the STL topologically watertight.
     const poleRadius=radius;
     pos.push(0,poleRadius,0);col.push(cHi.r,cHi.g,cHi.b);maxY=poleRadius;
@@ -372,14 +373,22 @@ lead: x--x--x-</textarea>
         if(labShape){
           if(labShape.empty)displacement=0;
           else{
-            // Broad footprints and capped summits avoid fragile needles and steep overhangs.
-            let kickPlateaus=0,snareRings=0,leadSpirals=0,melodyRills=0;
-            for(const p of kickEvents){const d=Math.hypot(px-p.x,pz-p.z)/p.width,edge=Math.max(0,Math.min(1,(d-.48)/1.18)),falloff=1-edge*edge*(3-2*edge);kickPlateaus+=falloff*(1.15+state.sharpness*.45);}
-            for(const p of snareEvents){const dx=px-p.x,dz=pz-p.z,d=Math.hypot(dx,dz),mask=Math.exp(-Math.pow(d/(p.width*2.05),4));snareRings+=mask*(Math.exp(-Math.pow((d-p.width*.78)/(p.width*.2),2))*1.35-Math.exp(-Math.pow(d/(p.width*.52),2))*.9);}
-            for(const p of leadEvents){const dx=px-p.x,dz=pz-p.z,d=Math.hypot(dx,dz),a=Math.atan2(dz,dx),mask=Math.exp(-Math.pow(d/(p.width*2.15),4)),core=1-Math.exp(-Math.pow(d/(p.width*.3),2));leadSpirals+=mask*core*(Math.pow(.5+.5*Math.cos(d*54-a*2),2)-.23);const phase=Math.atan2(Math.sin(angle-p.step*Math.PI*2),Math.cos(angle-p.step*Math.PI*2)),curved=phase-.22*Math.sin(theta*3.4+p.step*7),ridge=Math.exp(-Math.pow(curved/.052,2)),groove=Math.exp(-Math.pow(curved/.019,2));melodyRills+=(ridge*.72-groove*.46)*(.35+.65*Math.sin(theta));}
-            const bassWaves=bassOn*(Math.pow(.5+.5*Math.sin((pz+.16*Math.sin(px*4.5))*31),2.2)-.28)*state.ridges/100*2.15;
-            const hatGrooves=hatOn*(Math.pow(.5+.5*Math.sin(angle*18+theta*25),3)-.34)*state.texture/100*.95;
-            displacement=state.relief*envelope*(kickPlateaus*1.8+snareRings*state.circles/100*1.8+bassWaves+hatGrooves+leadSpirals*state.spirals/100*2.8+melodyRills*state.ridges/100*2.2);
+            // Bassdrum: three broad, capped plateaus. They stay low and rounded for easy printing.
+            const beatPhase=selectedBeat/labShape.steps*Math.PI*2;
+            const cappedHill=(cx,cz,width)=>1/(1+Math.pow(Math.hypot(px-cx,pz-cz)/width,6));
+            const kickPlateaus=kickOn*(cappedHill(.38*Math.cos(beatPhase),.38*Math.sin(beatPhase),.25)*1.18+cappedHill(.52*Math.cos(beatPhase+2.3),.52*Math.sin(beatPhase+2.3),.19)*.66+cappedHill(.28*Math.cos(beatPhase-2.05),.28*Math.sin(beatPhase-2.05),.16)*.42);
+            // Snare: one readable crater with three soft concentric rings.
+            const snareX=.34*Math.cos(beatPhase+1.05),snareZ=.34*Math.sin(beatPhase+1.05),snareD=Math.hypot(px-snareX,pz-snareZ),snareMask=Math.exp(-Math.pow(snareD/.35,4));
+            const snareRings=snareOn*snareMask*(Math.exp(-Math.pow((snareD-.115)/.028,2))*1.05+Math.exp(-Math.pow((snareD-.19)/.032,2))*.72+Math.exp(-Math.pow((snareD-.26)/.035,2))*.48-Math.exp(-Math.pow(snareD/.072,2))*.92);
+            // Hi-Hat: fine radial grooves run from rim to pole, visible across the complete body.
+            const hatGrooves=hatOn*(Math.pow(.5+.5*Math.cos(angle*30+theta*6+beatPhase*2),6)-.2)*state.texture/100*1.24;
+            // Bass: low, long wave valleys create a clearly different, flowing surface.
+            const bassWaves=bassOn*(Math.sin((pz*4.2+px*2.4)*Math.PI+beatPhase)+.38*Math.sin((pz*2.05-px*.9)*Math.PI-beatPhase*1.4))*.5*state.ridges/100*1.55;
+            // Melody: two continuous, grooved spirals sweep around the dome instead of isolated marks.
+            const spiralPhase=angle*2.25-Math.hypot(px,pz)*22+beatPhase*1.7;
+            const leadSpirals=leadOn*(Math.pow(.5+.5*Math.cos(spiralPhase),7)-.16)*state.spirals/100*1.65;
+            const melodyRills=leadOn*(Math.pow(.5+.5*Math.cos(spiralPhase*2.15+theta*8),5)-.21)*state.ridges/100*.72;
+            displacement=state.relief*envelope*(kickPlateaus*1.52+snareRings*state.circles/100*1.64+hatGrooves+bassWaves+leadSpirals+melodyRills);
           }
         }else displacement=state.relief*envelope*(e*.2+ribbons+mountains*(.5+e+onset)*1.7+basin+bumps+snails*state.spirals/100*3.8+ringsField*state.circles/100*2.5);
         const x=radius*Math.sin(theta)*Math.cos(angle),y=Math.max(0,radius*Math.cos(theta)+displacement),z=radius*Math.sin(theta)*Math.sin(angle);
