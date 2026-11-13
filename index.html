@@ -84,7 +84,7 @@
 <body>
 <div class="app">
   <header>
-    <div class="brand"><div class="brand-mark" aria-hidden="true"></div><div>KlangKuppel<small>Music → Matter Lab · v1.0.2</small></div></div>
+    <div class="brand"><div class="brand-mark" aria-hidden="true"></div><div>KlangKuppel<small>Music → Matter Lab · v1.1.0</small></div></div>
     <div class="header-note">Alles bleibt auf diesem Gerät</div>
   </header>
   <main>
@@ -133,6 +133,10 @@ lead: x--x--x-</textarea>
         <div class="slider"><label for="relief">Reliefstärke</label><output id="reliefOut">6,0 mm</output><input id="relief" type="range" min="1" max="10" value="6" step="0.5"></div>
         <div class="slider"><label for="sharpness">Rund ↔ spitz</label><output id="sharpnessOut">55 %</output><input id="sharpness" type="range" min="0" max="100" value="55" step="1"></div>
         <div class="slider"><label for="smooth">Glättung</label><output id="smoothOut">35 %</output><input id="smooth" type="range" min="0" max="80" value="35" step="1"></div>
+        <div class="slider"><label for="ridges">Wellenrippen</label><output id="ridgesOut">70 %</output><input id="ridges" type="range" min="0" max="100" value="70"></div>
+        <div class="slider"><label for="valleys">Mulden & Täler</label><output id="valleysOut">60 %</output><input id="valleys" type="range" min="0" max="100" value="60"></div>
+        <div class="slider"><label for="texture">Fühlbare Textur</label><output id="textureOut">45 %</output><input id="texture" type="range" min="0" max="100" value="45"></div>
+        <p class="mode-help">Klanglandschaft: Lautstärke → Höhe · Klangwechsel → Berge · tiefe Klänge → Wellen · leise Stellen → Mulden. Künstlerische Übersetzung der Frequenzanalyse.</p>
         <div class="slider"><label for="detail">Detaildichte</label><output id="detailOut">Mittel</output><input id="detail" type="range" min="0" max="2" value="1" step="1"></div>
         <div class="slider"><label for="baseHeight">Bodenstärke</label><output id="baseOut">2,4 mm</output><input id="baseHeight" type="range" min="1.6" max="5" value="2.4" step="0.2"></div>
         <div class="checks">
@@ -149,7 +153,7 @@ lead: x--x--x-</textarea>
       <canvas id="canvas"></canvas>
       <div class="stage-top">
         <div class="badge" id="analysisBadge">● DEMO · SYNTHETISCHE KLANGDATEN</div>
-        <div class="legend"><div><i style="background:#b7f34b"></i> hohe Frequenzen</div><div><i style="background:#8b7cff"></i> mittlere Frequenzen</div><div><i style="background:#ff7b4d"></i> tiefe Frequenzen</div></div>
+        <div class="legend"><div>Wellen · Rhythmus</div><div>Berge · Klangwechsel</div><div>Mulden · leise Stellen</div><div>Mattweiß · Druckvorschau</div></div>
       </div>
       <div class="view-tools" aria-label="3D-Ansichten">
         <button class="view-btn active" id="autoRotate" aria-pressed="true">⟳ Auto</button>
@@ -182,17 +186,18 @@ lead: x--x--x-</textarea>
   const camera=new THREE.PerspectiveCamera(34,1,.1,1000); camera.position.set(0,18,142);camera.lookAt(0,18,0);
   const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true,preserveDrawingBuffer:false});
   renderer.setPixelRatio(Math.min(devicePixelRatio,2)); renderer.outputEncoding=THREE.sRGBEncoding;
-  scene.add(new THREE.HemisphereLight(0xe9f4ff,0x29213b,1.25));
-  const key=new THREE.DirectionalLight(0xd8ff9c,1.6);key.position.set(-60,100,70);scene.add(key);
-  const rim=new THREE.DirectionalLight(0x8b7cff,1.8);rim.position.set(80,30,-80);scene.add(rim);
+  renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=.85;
+  scene.add(new THREE.HemisphereLight(0xf3f6ff,0x37343b,.75));
+  const key=new THREE.DirectionalLight(0xfff5e5,1.3);key.position.set(-60,100,70);scene.add(key);
+  const rim=new THREE.DirectionalLight(0xe5edff,.85);rim.position.set(80,30,-80);scene.add(rim);
   const floor=new THREE.Mesh(new THREE.CircleGeometry(74,96),new THREE.MeshBasicMaterial({color:0x11121b,transparent:true,opacity:.72,side:THREE.DoubleSide}));floor.rotation.x=-Math.PI/2;floor.position.y=-2.8;floor.visible=false;scene.add(floor);
   const grid=new THREE.GridHelper(150,15,0x343547,0x232431);grid.position.y=-2.5;grid.visible=false;scene.add(grid);
-  const modelGroup=new THREE.Group();modelGroup.position.y=18;modelGroup.rotation.set(-.22,.55,.04);scene.add(modelGroup);
+  const modelGroup=new THREE.Group();modelGroup.position.y=18;modelGroup.rotation.set(.55,.55,.04);scene.add(modelGroup);
 
   let mesh, audioBuffer=null, source=null, audioCtx=null, playing=false, demoSeed=2;
   let spectral=makeDemo(demoSeed), geometryInfo={triangles:0,maxHeight:46};
-  const state={relief:6,sharpness:.55,smooth:.35,detail:1,baseHeight:2.4,mirror:false,wire:false};
-  const mat=new THREE.MeshStandardMaterial({color:0x9b8dff,roughness:.36,metalness:.08,vertexColors:true,side:THREE.FrontSide});
+  const state={relief:6,sharpness:.55,smooth:.35,ridges:70,valleys:60,texture:45,detail:1,baseHeight:2.4,mirror:false,wire:false};
+  const mat=new THREE.MeshStandardMaterial({color:0xeee9e0,roughness:.72,metalness:0,vertexColors:false,side:THREE.FrontSide});
   const tracks={
     kick:{name:'🥁 Bass',color:'#ff704c'},snare:{name:'👏 Snare',color:'#ffb84d'},hat:{name:'✨ Hi-Hat',color:'#b7f34b'},
     bass:{name:'🎸 Bass',color:'#48d7c8'},lead:{name:'🎹 Melodie',color:'#9a87ff'}
@@ -276,20 +281,28 @@ lead: x--x--x-</textarea>
   }
 
   function rebuild(){
-    const segs=[64,96,128][state.detail],rings=[24,34,46][state.detail],map=smoothedMap(spectral,state.smooth);
+    const segs=[128,256,384][state.detail],rings=[48,96,128][state.detail],map=smoothedMap(spectral,state.smooth);
     const pos=[],col=[],idx=[],radius=40; let maxY=0;
     const cLow=new THREE.Color(0xff704c),cMid=new THREE.Color(0x8b7cff),cHi=new THREE.Color(0xb7f34b),c=new THREE.Color();
     // A single shared pole keeps the STL topologically watertight.
-    const poleEnergy=sampleMap(map,0,1),poleRadius=radius+state.relief*Math.pow(poleEnergy,1+state.sharpness*2.4)*.14;
+    const poleRadius=radius;
     pos.push(0,poleRadius,0);col.push(cHi.r,cHi.g,cHi.b);maxY=poleRadius;
     for(let j=1;j<=rings;j++){
       const v=j/rings,theta=v*Math.PI/2;
       for(let i=0;i<segs;i++){
         const u=i/segs,e=sampleMap(map,u,1-v); // rim=low, pole=high frequencies
-        const shaped=Math.pow(e,1+state.sharpness*2.4);
-        const envelope=Math.sin(theta)*.86+.14; // keep pole controlled
-        const rr=radius+state.relief*shaped*envelope;
-        const x=rr*Math.sin(theta)*Math.cos(u*Math.PI*2),y=rr*Math.cos(theta),z=rr*Math.sin(theta)*Math.sin(u*Math.PI*2);
+        const angle=u*Math.PI*2,low=sampleMap(map,u,.15),high=sampleMap(map,u,.8);
+        const previous=sampleMap(map,u-1/128,1-v),onset=Math.max(0,e-previous);
+        // Smooth height field over a fixed circular footprint: no detached features or undercuts.
+        const envelope=Math.pow(Math.sin(theta),1.2)*Math.pow(Math.cos(theta),.65);
+        const wavePhase=v*13*Math.PI*2+Math.sin(angle*3)*1.8+low*3;
+        const ribbons=Math.pow(.5+.5*Math.sin(wavePhase),3)*low*state.ridges/100*2.4;
+        const mountainCarrier=Math.pow(.5+.5*Math.cos(angle*16+v*5),3+state.sharpness*5);
+        const mountains=mountainCarrier*(e*.8+onset*4)*(.7+state.sharpness*2.5);
+        const basin=-state.valleys/100*(1-e)*(.5+.5*Math.sin(angle*4+v*9))*1.5;
+        const bumps=state.texture/100*high*Math.pow(Math.max(0,Math.sin(angle*30+v*8)*Math.sin(v*24*Math.PI)),2)*.65;
+        const displacement=state.relief*envelope*(e*.6+ribbons+mountains+basin+bumps);
+        const x=radius*Math.sin(theta)*Math.cos(angle),y=Math.max(0,radius*Math.cos(theta)+displacement),z=radius*Math.sin(theta)*Math.sin(angle);
         pos.push(x,y,z);maxY=Math.max(maxY,y);
         if(v<.45)c.copy(cHi).lerp(cMid,v/.45);else c.copy(cMid).lerp(cLow,(v-.45)/.55);
         c.offsetHSL(0,0,(e-.5)*.09);col.push(c.r,c.g,c.b);
@@ -308,7 +321,9 @@ lead: x--x--x-</textarea>
     for(let i=0;i<segs;i++){const n=(i+1)%segs;idx.push(center,bottomStart+n,bottomStart+i);}
     // Normalize the widest radial extent to exactly 80 mm; point every face outward.
     let maxRadius=0;for(let i=0;i<pos.length;i+=3)maxRadius=Math.max(maxRadius,Math.hypot(pos[i],pos[i+2]));
-    for(let i=0;i<pos.length;i+=3){pos[i]*=40/maxRadius;pos[i+2]*=40/maxRadius;}
+    const heightScale=(40-state.baseHeight)/maxY;
+    for(let i=0;i<pos.length;i+=3){pos[i]*=40/maxRadius;pos[i+2]*=40/maxRadius;if(pos[i+1]>0)pos[i+1]*=heightScale;}
+    maxY=40-state.baseHeight;
     for(let i=0;i<idx.length;i+=3)[idx[i+1],idx[i+2]]=[idx[i+2],idx[i+1]];
     const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));g.setIndex(idx);g.computeVertexNormals();g.computeBoundingSphere();
     if(mesh){modelGroup.remove(mesh);mesh.geometry.dispose();} mesh=new THREE.Mesh(g,mat);mesh.position.y=-18;modelGroup.add(mesh);mat.wireframe=state.wire;
@@ -357,6 +372,7 @@ lead: x--x--x-</textarea>
   function bindSlider(id,key,out,fmt){const el=$(id);el.addEventListener('input',()=>{state[key]=+el.value;if(key==='sharpness'||key==='smooth')state[key]/=100;$(out).textContent=fmt(+el.value);rebuild();});}
   bindSlider('relief','relief','reliefOut',v=>v.toFixed(1).replace('.',',')+' mm');
   bindSlider('sharpness','sharpness','sharpnessOut',v=>v+' %');bindSlider('smooth','smooth','smoothOut',v=>v+' %');
+  bindSlider('ridges','ridges','ridgesOut',v=>v+' %');bindSlider('valleys','valleys','valleysOut',v=>v+' %');bindSlider('texture','texture','textureOut',v=>v+' %');
   bindSlider('detail','detail','detailOut',v=>['Grob','Mittel','Fein'][v]);bindSlider('baseHeight','baseHeight','baseOut',v=>v.toFixed(1).replace('.',',')+' mm');
   $('mirror').addEventListener('change',e=>{state.mirror=e.target.checked;rebuild();});$('wire').addEventListener('change',e=>{state.wire=e.target.checked;mat.wireframe=state.wire;});
   $('audioFile').addEventListener('change',e=>loadAudio(e.target.files[0]));$('playBtn').addEventListener('click',toggleAudio);$('exportBtn').addEventListener('click',exportSTL);
@@ -387,7 +403,7 @@ lead: x--x--x-</textarea>
   });
   const pointerEnd=e=>{pointers.delete(e.pointerId);lastPinch=0;lastTwist=0;touchMetrics();};canvas.addEventListener('pointerup',pointerEnd);canvas.addEventListener('pointercancel',pointerEnd);
   canvas.addEventListener('wheel',e=>{e.preventDefault();disableAuto();distance*=1+Math.sign(e.deltaY)*.08;setCamera()},{passive:false});
-  function setView(view){disableAuto();const rotations={iso:[-.35,.65,.08],front:[0,0,0],top:[-Math.PI/2,0,0],bottom:[Math.PI/2,0,0],reset:[-.22,.55,.04]},r=rotations[view]||rotations.reset;modelGroup.quaternion.setFromEuler(new THREE.Euler(r[0],r[1],r[2],'XYZ'));distance=view==='top'||view==='bottom'?132:142;setCamera();}
+  function setView(view){disableAuto();const rotations={iso:[.55,.65,.08],front:[0,0,0],top:[Math.PI/2,0,0],bottom:[-Math.PI/2,0,0],reset:[.55,.55,.04]},r=rotations[view]||rotations.reset;modelGroup.quaternion.setFromEuler(new THREE.Euler(r[0],r[1],r[2],'XYZ'));distance=view==='top'||view==='bottom'?132:142;setCamera();}
   document.querySelectorAll('[data-view]').forEach(b=>b.addEventListener('click',()=>setView(b.dataset.view)));
   $('autoRotate').addEventListener('click',()=>{autoSpin=!autoSpin;$('autoRotate').classList.toggle('active',autoSpin);$('autoRotate').setAttribute('aria-pressed',String(autoSpin));});
   $('turntable').addEventListener('click',()=>{const show=!grid.visible;grid.visible=floor.visible=show;$('turntable').classList.toggle('active',show);$('turntable').setAttribute('aria-pressed',String(show));});
