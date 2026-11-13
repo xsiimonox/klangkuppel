@@ -51,8 +51,8 @@
     .btn:active{transform:scale(.98)}.btn:hover{filter:brightness(1.1)}
     .btn.acid{background:var(--acid);color:#10120c}.btn:disabled{opacity:.42;cursor:not-allowed}
     .section{border-top:1px solid var(--line);padding-top:16px;margin-top:16px}
-    .section-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:13px}
-    .section-head h2{font-size:13px;margin:0;letter-spacing:.01em}.section-head span{font-size:10px;color:var(--muted)}
+    .section-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:13px}
+    .section-head h2{font-size:13px;margin:0;letter-spacing:.01em}.section-tools{display:flex;align-items:center;gap:7px}.section-tools span{font-size:10px;color:var(--muted)}.reset-form{border:1px solid var(--line);background:#252633;color:#dddce5;border-radius:8px;padding:6px 8px;font-size:9px;font-weight:750;cursor:pointer}.reset-form:hover{border-color:var(--acid);color:var(--acid)}
     .slider{display:grid;grid-template-columns:1fr 48px;gap:4px 12px;margin:0 0 13px;align-items:center}
     .slider label{font-size:12px;color:#dddce5}.slider output{text-align:right;font-size:11px;font-variant-numeric:tabular-nums;color:var(--acid)}
     .slider input{grid-column:1/-1;width:100%;height:20px;margin:-2px 0 0;accent-color:var(--acid)}
@@ -85,7 +85,7 @@
 <body>
 <div class="app">
   <header>
-    <div class="brand"><div class="brand-mark" aria-hidden="true"></div><div>KlangKuppel<small>Music → Matter Lab · v1.4.0</small></div></div>
+    <div class="brand"><div class="brand-mark" aria-hidden="true"></div><div>KlangKuppel<small>Music → Matter Lab · v1.4.1</small></div></div>
     <div class="header-note">Alles bleibt auf diesem Gerät</div>
   </header>
   <main>
@@ -131,7 +131,7 @@ lead: x--x--x-</textarea>
       </div>
 
       <section class="section">
-        <div class="section-head"><h2>Form gestalten</h2><span>Live-Vorschau</span></div>
+        <div class="section-head"><h2>Form gestalten</h2><div class="section-tools"><span>Live-Vorschau</span><button class="reset-form" id="resetForm" type="button">↺ Zurücksetzen</button></div></div>
         <div class="slider"><label for="relief">Reliefstärke</label><output id="reliefOut">6,0 mm</output><input id="relief" type="range" min="1" max="10" value="6" step="0.5"></div>
         <div class="slider"><label for="sharpness">Rund ↔ kantig</label><output id="sharpnessOut">55 %</output><input id="sharpness" type="range" min="0" max="100" value="55" step="1"></div>
         <div class="slider"><label for="smooth">Glättung</label><output id="smoothOut">35 %</output><input id="smooth" type="range" min="0" max="80" value="35" step="1"></div>
@@ -411,6 +411,7 @@ lead: x--x--x-</textarea>
   bindSlider('ridges','ridges','ridgesOut',v=>v+' %');bindSlider('valleys','valleys','valleysOut',v=>v+' %');bindSlider('texture','texture','textureOut',v=>v+' %');
   bindSlider('spirals','spirals','spiralsOut',v=>v+' %');bindSlider('circles','circles','circlesOut',v=>v+' %');
   bindSlider('detail','detail','detailOut',v=>['Grob','Mittel','Fein'][v]);bindSlider('baseHeight','baseHeight','baseOut',v=>v.toFixed(1).replace('.',',')+' mm');
+  $('resetForm').addEventListener('click',()=>{const values={relief:6,sharpness:55,smooth:35,ridges:70,valleys:60,texture:45,spirals:85,circles:80,detail:1,baseHeight:2.4};for(const [id,value] of Object.entries(values))$(id).value=value;Object.assign(state,{relief:6,sharpness:.55,smooth:.35,ridges:70,valleys:60,texture:45,spirals:85,circles:80,detail:1,baseHeight:2.4,mirror:false,wire:false});$('reliefOut').textContent='6,0 mm';$('sharpnessOut').textContent='55 %';$('smoothOut').textContent='35 %';$('ridgesOut').textContent='70 %';$('valleysOut').textContent='60 %';$('textureOut').textContent='45 %';$('spiralsOut').textContent='85 %';$('circlesOut').textContent='80 %';$('detailOut').textContent='Mittel';$('baseOut').textContent='2,4 mm';$('mirror').checked=false;$('wire').checked=false;mat.wireframe=false;rebuild();showToast('Form-Einstellungen zurückgesetzt');});
   $('mirror').addEventListener('change',e=>{state.mirror=e.target.checked;rebuild();});$('wire').addEventListener('change',e=>{state.wire=e.target.checked;mat.wireframe=state.wire;});
   $('audioFile').addEventListener('change',e=>loadAudio(e.target.files[0]));$('playBtn').addEventListener('click',toggleAudio);$('exportBtn').addEventListener('click',exportSTL);
   document.querySelectorAll('.mode-tab').forEach(tab=>tab.addEventListener('click',()=>{activeMode=tab.dataset.mode;document.querySelectorAll('.mode-tab').forEach(t=>{t.classList.toggle('active',t===tab);t.setAttribute('aria-selected',t===tab?'true':'false');});if(activeMode==='code')syncCodeFromPattern();renderSequencer();showToast('Modus: '+activeModeLabel());}));
