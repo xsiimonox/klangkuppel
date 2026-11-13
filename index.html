@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#10111a">
+  <title>KlangKuppel – Musik als 3D-Objekt</title>
+  <meta name="description" content="Kostenlose, iPad-taugliche Web-App: Musik analysieren, als druckbare 3D-Halbkugel gestalten und als STL exportieren.">
+  <style>
+    :root{--ink:#f5f3ef;--muted:#aaa9b5;--panel:#191a26;--panel2:#222330;--line:#343546;--acid:#b7f34b;--violet:#8b7cff;--orange:#ff7b4d;--shadow:0 20px 60px #0008}
+    *{box-sizing:border-box}
+    html,body{margin:0;min-height:100%;background:#0d0e15;color:var(--ink);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    body{overflow-x:hidden;background:radial-gradient(circle at 70% 0,#272044 0,transparent 34rem),#0d0e15}
+    button,input{font:inherit}
+    button{touch-action:manipulation}
+    .app{min-height:100vh;display:grid;grid-template-rows:auto 1fr}
+    header{height:72px;padding:0 max(18px,env(safe-area-inset-left));display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #ffffff12;background:#10111acc;backdrop-filter:blur(18px);z-index:5}
+    .brand{display:flex;align-items:center;gap:12px;font-weight:850;letter-spacing:-.03em}
+    .brand-mark{width:34px;height:34px;border-radius:50%;background:radial-gradient(circle at 40% 32%,var(--acid) 0 8%,transparent 9%),conic-gradient(from 200deg,var(--violet),var(--acid),var(--orange),var(--violet));box-shadow:inset 0 0 0 7px #11121b}
+    .brand small{display:block;color:var(--muted);font-size:10px;letter-spacing:.12em;text-transform:uppercase;margin-top:1px}
+    .header-note{font-size:12px;color:var(--muted);display:flex;gap:8px;align-items:center}
+    .header-note::before{content:"";width:7px;height:7px;background:var(--acid);border-radius:50%;box-shadow:0 0 12px var(--acid)}
+    main{display:grid;grid-template-columns:minmax(310px,390px) 1fr;min-height:calc(100vh - 72px)}
+    .controls{padding:22px 20px 34px;border-right:1px solid #ffffff12;background:#12131c;overflow:auto}
+    .eyebrow{color:var(--acid);text-transform:uppercase;font-size:11px;letter-spacing:.16em;font-weight:800}
+    h1{font-size:clamp(28px,3.2vw,44px);line-height:.96;letter-spacing:-.055em;margin:10px 0 10px;max-width:340px}
+    .intro{color:var(--muted);font-size:14px;line-height:1.5;margin:0 0 18px}
+    .drop{position:relative;border:1px dashed #646579;border-radius:16px;padding:16px;background:linear-gradient(135deg,#202231,#171822);transition:.2s;cursor:pointer}
+    .drop.drag{border-color:var(--acid);background:#b7f34b10;transform:translateY(-2px)}
+    .drop input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%}
+    .drop-top{display:flex;gap:12px;align-items:center;pointer-events:none}
+    .upload-icon{width:40px;height:40px;display:grid;place-items:center;border-radius:12px;background:var(--acid);color:#111;font-size:20px;font-weight:900}
+    .drop strong{font-size:14px}.drop span{display:block;color:var(--muted);font-size:11px;margin-top:3px}
+    .file-row{display:flex;align-items:center;gap:8px;margin-top:10px;min-height:22px;color:#dad9e3;font-size:12px}
+    .file-row .dot{width:6px;height:6px;background:var(--orange);border-radius:50%;flex:none}
+    .actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0 20px}
+    .btn{border:0;border-radius:11px;min-height:43px;padding:10px 13px;cursor:pointer;font-weight:760;transition:transform .16s,filter .16s;background:#2a2b39;color:var(--ink)}
+    .btn:active{transform:scale(.98)}.btn:hover{filter:brightness(1.1)}
+    .btn.acid{background:var(--acid);color:#10120c}.btn:disabled{opacity:.42;cursor:not-allowed}
+    .section{border-top:1px solid var(--line);padding-top:16px;margin-top:16px}
+    .section-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:13px}
+    .section-head h2{font-size:13px;margin:0;letter-spacing:.01em}.section-head span{font-size:10px;color:var(--muted)}
+    .slider{display:grid;grid-template-columns:1fr 48px;gap:4px 12px;margin:0 0 13px;align-items:center}
+    .slider label{font-size:12px;color:#dddce5}.slider output{text-align:right;font-size:11px;font-variant-numeric:tabular-nums;color:var(--acid)}
+    .slider input{grid-column:1/-1;width:100%;height:20px;margin:-2px 0 0;accent-color:var(--acid)}
+    .checks{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .chip{display:flex;align-items:center;gap:7px;background:#222330;border:1px solid var(--line);border-radius:10px;padding:9px;font-size:11px;color:#d5d4dd}
+    .chip input{accent-color:var(--acid);width:16px;height:16px}
+    .export{margin-top:18px;width:100%;background:linear-gradient(90deg,var(--violet),#a98cff);color:white;min-height:52px;box-shadow:0 10px 24px #8b7cff22}
+    .fineprint{font-size:10px;line-height:1.45;color:#777887;margin:10px 2px 0}
+    .stage{position:relative;min-height:600px;overflow:hidden;background:radial-gradient(circle at 52% 40%,#2c2d40 0,#171822 42%,#0e0f16 80%)}
+    #canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+    .stage-top{position:absolute;inset:20px 22px auto;display:flex;justify-content:space-between;align-items:flex-start;pointer-events:none}
+    .badge{background:#10111bd9;border:1px solid #ffffff18;backdrop-filter:blur(12px);border-radius:999px;padding:9px 12px;font-size:11px;color:#c9c8d3;box-shadow:var(--shadow)}
+    .legend{display:grid;gap:6px;background:#10111bd9;border:1px solid #ffffff18;padding:11px 12px;border-radius:14px;font-size:10px;color:var(--muted);backdrop-filter:blur(12px)}
+    .legend div{display:flex;gap:7px;align-items:center}.legend i{width:8px;height:8px;border-radius:50%;display:block}
+    .stage-bottom{position:absolute;left:22px;right:22px;bottom:20px;display:flex;align-items:end;justify-content:space-between;gap:12px;pointer-events:none}
+    .metrics{display:flex;flex-wrap:wrap;gap:8px}
+    .metric{min-width:95px;background:#11121bd9;border:1px solid #ffffff18;border-radius:12px;padding:10px 12px;backdrop-filter:blur(10px)}
+    .metric b{font-size:15px;display:block}.metric span{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em}
+    .hint{max-width:190px;text-align:right;font-size:10px;line-height:1.4;color:#8f909e}
+    .toast{position:fixed;left:50%;bottom:24px;z-index:20;transform:translate(-50%,120px);opacity:0;background:#f5f3ef;color:#14151e;padding:11px 16px;border-radius:999px;font-size:12px;font-weight:750;box-shadow:var(--shadow);transition:.3s}
+    .toast.show{transform:translate(-50%,0);opacity:1}
+    .progress{height:2px;background:#2b2c39;margin-top:12px;overflow:hidden;border-radius:2px;display:none}.progress i{display:block;height:100%;width:0;background:var(--acid);transition:width .2s}
+    @media(max-width:780px){header{height:64px}.header-note{display:none}main{grid-template-columns:1fr;grid-template-rows:auto min(70vh,620px)}.controls{border-right:0;border-bottom:1px solid #ffffff12;overflow:visible}.stage{min-height:520px}.stage-top{inset:14px}.legend{display:none}.stage-bottom{left:14px;right:14px;bottom:14px}.hint{display:none}.metric{min-width:82px;padding:8px 10px}.metric b{font-size:13px}}
+    @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
+  </style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand"><div class="brand-mark" aria-hidden="true"></div><div>KlangKuppel<small>Music → Matter Lab</small></div></div>
+    <div class="header-note">Alles bleibt auf diesem Gerät</div>
+  </header>
+  <main>
+    <aside class="controls">
+      <div class="eyebrow">MINT-Werkzeug</div>
+      <h1>Dein Song wird greifbar.</h1>
+      <p class="intro">Lade Musik hoch, forme ihren Klang und exportiere eine druckfertige 8-cm-Kuppel.</p>
+
+      <div class="drop" id="dropZone">
+        <input id="audioFile" type="file" accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg" aria-label="Audiodatei auswählen">
+        <div class="drop-top"><div class="upload-icon">＋</div><div><strong>Audiodatei wählen</strong><span>MP3, WAV, M4A oder AAC · max. 5 Min.</span></div></div>
+        <div class="progress" id="progress"><i></i></div>
+      </div>
+      <div class="file-row"><i class="dot"></i><span id="fileStatus">Demo-Klangmuster ist aktiv</span></div>
+      <div class="actions">
+        <button class="btn" id="demoBtn">↻ Neue Demo</button>
+        <button class="btn" id="playBtn" disabled>▶ Anhören</button>
+      </div>
+
+      <section class="section">
+        <div class="section-head"><h2>Form gestalten</h2><span>Live-Vorschau</span></div>
+        <div class="slider"><label for="relief">Reliefstärke</label><output id="reliefOut">6,0 mm</output><input id="relief" type="range" min="1" max="10" value="6" step="0.5"></div>
+        <div class="slider"><label for="sharpness">Rund ↔ spitz</label><output id="sharpnessOut">55 %</output><input id="sharpness" type="range" min="0" max="100" value="55" step="1"></div>
+        <div class="slider"><label for="smooth">Glättung</label><output id="smoothOut">35 %</output><input id="smooth" type="range" min="0" max="80" value="35" step="1"></div>
+        <div class="slider"><label for="detail">Detaildichte</label><output id="detailOut">Mittel</output><input id="detail" type="range" min="0" max="2" value="1" step="1"></div>
+        <div class="slider"><label for="baseHeight">Bodenstärke</label><output id="baseOut">2,4 mm</output><input id="baseHeight" type="range" min="1.6" max="5" value="2.4" step="0.2"></div>
+        <div class="checks">
+          <label class="chip"><input id="mirror" type="checkbox"> Spiegeln</label>
+          <label class="chip"><input id="wire" type="checkbox"> Gitternetz</label>
+        </div>
+      </section>
+
+      <button class="btn export" id="exportBtn">STL für 3D-Druck exportieren</button>
+      <p class="fineprint">Einheit: Millimeter · Durchmesser: 80 mm · geschlossener Volumenkörper · empfohlen: 0,2-mm-Schichthöhe, flache Seite aufs Druckbett.</p>
+    </aside>
+
+    <section class="stage" aria-label="Interaktive 3D-Vorschau">
+      <canvas id="canvas"></canvas>
+      <div class="stage-top">
+        <div class="badge" id="analysisBadge">● DEMO · SYNTHETISCHE KLANGDATEN</div>
+        <div class="legend"><div><i style="background:#b7f34b"></i> hohe Frequenzen</div><div><i style="background:#8b7cff"></i> mittlere Frequenzen</div><div><i style="background:#ff7b4d"></i> tiefe Frequenzen</div></div>
+      </div>
+      <div class="stage-bottom">
+        <div class="metrics"><div class="metric"><b>80 mm</b><span>Durchmesser</span></div><div class="metric"><b id="heightMetric">46 mm</b><span>Gesamthöhe</span></div><div class="metric"><b id="triMetric">12,4k</b><span>Dreiecke</span></div></div>
+        <div class="hint">Mit einem Finger drehen · Zwei Finger zoomen</div>
+      </div>
+    </section>
+  </main>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script>
+(() => {
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const canvas=$('canvas'), toast=$('toast');
+  if(!window.THREE){ document.querySelector('.stage').innerHTML='<div style="padding:40px">Die 3D-Bibliothek konnte nicht geladen werden. Bitte Internetverbindung prüfen und neu laden.</div>'; return; }
+
+  const scene=new THREE.Scene();
+  const camera=new THREE.PerspectiveCamera(34,1,.1,1000); camera.position.set(88,68,98);
+  const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true,preserveDrawingBuffer:false});
+  renderer.setPixelRatio(Math.min(devicePixelRatio,2)); renderer.outputEncoding=THREE.sRGBEncoding;
+  scene.add(new THREE.HemisphereLight(0xe9f4ff,0x29213b,1.25));
+  const key=new THREE.DirectionalLight(0xd8ff9c,1.6);key.position.set(-60,100,70);scene.add(key);
+  const rim=new THREE.DirectionalLight(0x8b7cff,1.8);rim.position.set(80,30,-80);scene.add(rim);
+  const floor=new THREE.Mesh(new THREE.CircleGeometry(74,96),new THREE.MeshBasicMaterial({color:0x11121b,transparent:true,opacity:.72}));floor.rotation.x=-Math.PI/2;floor.position.y=-2.8;scene.add(floor);
+  const grid=new THREE.GridHelper(150,15,0x343547,0x232431);grid.position.y=-2.5;scene.add(grid);
+
+  let mesh, audioBuffer=null, source=null, audioCtx=null, playing=false, demoSeed=2;
+  let spectral=makeDemo(demoSeed), geometryInfo={triangles:0,maxHeight:46};
+  const state={relief:6,sharpness:.55,smooth:.35,detail:1,baseHeight:2.4,mirror:false,wire:false};
+  const mat=new THREE.MeshStandardMaterial({color:0x9b8dff,roughness:.36,metalness:.08,vertexColors:true,side:THREE.FrontSide});
+
+  function makeDemo(seed){
+    const T=128,F=24,a=[]; let s=seed*999+17;
+    const rand=()=>{s=(s*16807)%2147483647;return(s-1)/2147483646};
+    for(let f=0;f<F;f++){a[f]=[];for(let t=0;t<T;t++){
+      const beat=Math.pow(Math.max(0,Math.sin(t/128*Math.PI*10)),5);
+      const melody=.5+.5*Math.sin(t*.17+f*.72+Math.sin(t*.035)*2);
+      const band=Math.exp(-Math.pow((f-(5+4*Math.sin(t*.045))),2)/18)+.65*Math.exp(-Math.pow((f-17),2)/28)*beat;
+      a[f][t]=Math.min(1,.08+band*.55+melody*.18+beat*(.12+f/F*.25)+rand()*.05);
+    }} return a;
+  }
+
+  function smoothedMap(map,amount){
+    if(amount<.02)return map; const F=map.length,T=map[0].length,passes=Math.round(amount*5),out=map.map(r=>r.slice());
+    for(let p=0;p<passes;p++){const src=out.map(r=>r.slice());for(let f=0;f<F;f++)for(let t=0;t<T;t++)out[f][t]=(src[f][t]*2+src[f][(t+T-1)%T]+src[f][(t+1)%T]+src[Math.max(0,f-1)][t]+src[Math.min(F-1,f+1)][t])/6;}
+    return out;
+  }
+
+  function sampleMap(map,u,v){
+    const F=map.length,T=map[0].length; let x=(state.mirror?1-u:u)*T; x=(x%T+T)%T; const y=Math.max(0,Math.min(F-1,v*(F-1)));
+    const x0=Math.floor(x)%T,x1=(x0+1)%T,y0=Math.floor(y),y1=Math.min(F-1,y0+1),fx=x-Math.floor(x),fy=y-y0;
+    return (map[y0][x0]*(1-fx)+map[y0][x1]*fx)*(1-fy)+(map[y1][x0]*(1-fx)+map[y1][x1]*fx)*fy;
+  }
+
+  function rebuild(){
+    const segs=[64,96,128][state.detail],rings=[24,34,46][state.detail],map=smoothedMap(spectral,state.smooth);
+    const pos=[],col=[],idx=[],radius=40; let maxY=0;
+    const cLow=new THREE.Color(0xff704c),cMid=new THREE.Color(0x8b7cff),cHi=new THREE.Color(0xb7f34b),c=new THREE.Color();
+    // A single shared pole keeps the STL topologically watertight.
+    const poleEnergy=sampleMap(map,0,1),poleRadius=radius+state.relief*Math.pow(poleEnergy,1+state.sharpness*2.4)*.14;
+    pos.push(0,poleRadius,0);col.push(cHi.r,cHi.g,cHi.b);maxY=poleRadius;
+    for(let j=1;j<=rings;j++){
+      const v=j/rings,theta=v*Math.PI/2;
+      for(let i=0;i<segs;i++){
+        const u=i/segs,e=sampleMap(map,u,1-v); // rim=low, pole=high frequencies
+        const shaped=Math.pow(e,1+state.sharpness*2.4);
+        const envelope=Math.sin(theta)*.86+.14; // keep pole controlled
+        const rr=radius+state.relief*shaped*envelope;
+        const x=rr*Math.sin(theta)*Math.cos(u*Math.PI*2),y=rr*Math.cos(theta),z=rr*Math.sin(theta)*Math.sin(u*Math.PI*2);
+        pos.push(x,y,z);maxY=Math.max(maxY,y);
+        if(v<.45)c.copy(cHi).lerp(cMid,v/.45);else c.copy(cMid).lerp(cLow,(v-.45)/.55);
+        c.offsetHSL(0,0,(e-.5)*.09);col.push(c.r,c.g,c.b);
+      }
+    }
+    // curved surface: cap fan, then connected latitude rings
+    for(let i=0;i<segs;i++){const n=(i+1)%segs;idx.push(0,1+i,1+n);}
+    for(let j=1;j<rings;j++)for(let i=0;i<segs;i++){const n=(i+1)%segs,a=1+(j-1)*segs+i,b=1+(j-1)*segs+n,d=1+j*segs+i,e=1+j*segs+n;idx.push(a,d,b,b,d,e);}
+    // vertical rim down to flat base
+    const bottomStart=pos.length/3;
+    for(let i=0;i<segs;i++){const u=i/segs,e=sampleMap(map,u,0),rr=radius+state.relief*Math.pow(e,1+state.sharpness*2.4)*.86;pos.push(rr*Math.cos(u*Math.PI*2),-state.baseHeight,rr*Math.sin(u*Math.PI*2));col.push(.18,.17,.24);}
+    const topRim=1+(rings-1)*segs;
+    for(let i=0;i<segs;i++){const n=(i+1)%segs,a=topRim+i,b=topRim+n,c1=bottomStart+i,d=bottomStart+n;idx.push(a,c1,b,b,c1,d);}
+    // flat, triangulated bottom; center lies below the equator
+    const center=pos.length/3;pos.push(0,-state.baseHeight,0);col.push(.12,.12,.17);
+    for(let i=0;i<segs;i++){const n=(i+1)%segs;idx.push(center,bottomStart+n,bottomStart+i);}
+    const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));g.setIndex(idx);g.computeVertexNormals();g.computeBoundingSphere();
+    if(mesh){scene.remove(mesh);mesh.geometry.dispose();} mesh=new THREE.Mesh(g,mat);mesh.rotation.y=.28;scene.add(mesh);mat.wireframe=state.wire;
+    geometryInfo={triangles:idx.length/3,maxHeight:maxY+state.baseHeight};
+    $('heightMetric').textContent=Math.round(geometryInfo.maxHeight)+' mm';$('triMetric').textContent=(geometryInfo.triangles/1000).toFixed(1).replace('.',',')+'k';
+  }
+
+  function fft(re,im){
+    const n=re.length;for(let i=1,j=0;i<n;i++){let bit=n>>1;for(;j&bit;bit>>=1)j^=bit;j^=bit;if(i<j){[re[i],re[j]]=[re[j],re[i]];}}
+    for(let len=2;len<=n;len<<=1){const ang=-2*Math.PI/len,wlr=Math.cos(ang),wli=Math.sin(ang);for(let i=0;i<n;i+=len){let wr=1,wi=0;for(let j=0;j<len/2;j++){const uR=re[i+j],uI=im[i+j],vR=re[i+j+len/2]*wr-im[i+j+len/2]*wi,vI=re[i+j+len/2]*wi+im[i+j+len/2]*wr;re[i+j]=uR+vR;im[i+j]=uI+vI;re[i+j+len/2]=uR-vR;im[i+j+len/2]=uI-vI;const q=wr*wlr-wi*wli;wi=wr*wli+wi*wlr;wr=q;}}}
+  }
+
+  async function analyze(buffer){
+    const T=128,F=24,N=1024,channels=buffer.numberOfChannels,sr=buffer.sampleRate,length=buffer.length,raw=Array.from({length:F},()=>Array(T).fill(0));let max=1e-9;
+    await new Promise(resolve=>{let t=0;const batch=()=>{const end=Math.min(T,t+8);for(;t<end;t++){
+      const center=Math.floor((t+.5)/T*length),re=new Float64Array(N),im=new Float64Array(N);
+      for(let n=0;n<N;n++){const p=Math.max(0,Math.min(length-1,center-N/2+n));let val=0;for(let ch=0;ch<channels;ch++)val+=buffer.getChannelData(ch)[p]/channels;re[n]=val*(.5-.5*Math.cos(2*Math.PI*n/(N-1)));}
+      fft(re,im);
+      for(let f=0;f<F;f++){const hz0=45*Math.pow(18000/45,f/F),hz1=45*Math.pow(18000/45,(f+1)/F),b0=Math.max(1,Math.floor(hz0*N/sr)),b1=Math.min(N/2-1,Math.ceil(hz1*N/sr));let sum=0;for(let b=b0;b<=b1;b++)sum+=Math.hypot(re[b],im[b]);const v=Math.log1p(sum/Math.max(1,b1-b0+1));raw[f][t]=v;max=Math.max(max,v);}
+    }$('progress').firstElementChild.style.width=Math.round(t/T*100)+'%';if(t<T)setTimeout(batch,0);else resolve();};batch();});
+    for(let f=0;f<F;f++)for(let t=0;t<T;t++)raw[f][t]=Math.pow(raw[f][t]/max,.72);return raw;
+  }
+
+  async function loadAudio(file){
+    if(!file)return;if(file.size>70*1024*1024){showToast('Datei ist zu groß (max. 70 MB)');return;}
+    $('progress').style.display='block';$('progress').firstElementChild.style.width='5%';$('fileStatus').textContent='Audio wird gelesen …';
+    try{audioCtx=audioCtx||new(window.AudioContext||window.webkitAudioContext)();const data=await file.arrayBuffer();audioBuffer=await audioCtx.decodeAudioData(data.slice(0));
+      if(audioBuffer.duration>300)throw new Error('Bitte ein Musikstück mit maximal 5 Minuten verwenden.');
+      $('fileStatus').textContent='Klang wird analysiert …';spectral=await analyze(audioBuffer);rebuild();$('fileStatus').textContent=file.name+' · '+formatTime(audioBuffer.duration);$('analysisBadge').textContent='● ANALYSE · '+file.name.toUpperCase();$('playBtn').disabled=false;showToast('Musik erfolgreich in Form übersetzt');
+    }catch(err){console.error(err);$('fileStatus').textContent='Datei konnte nicht analysiert werden';showToast(err.message||'Dieses Audioformat wird nicht unterstützt');}
+    finally{setTimeout(()=>{$('progress').style.display='none';},500);}
+  }
+
+  function formatTime(s){return Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0');}
+  function stopAudio(){if(source){try{source.stop()}catch(e){}source=null;}playing=false;$('playBtn').textContent='▶ Anhören';}
+  async function toggleAudio(){if(playing){stopAudio();return;}if(!audioBuffer)return;audioCtx=audioCtx||new(window.AudioContext||window.webkitAudioContext)();await audioCtx.resume();source=audioCtx.createBufferSource();source.buffer=audioBuffer;source.connect(audioCtx.destination);source.onended=stopAudio;source.start();playing=true;$('playBtn').textContent='■ Stoppen';}
+
+  function exportSTL(){
+    if(!mesh)return;const g=mesh.geometry,index=g.index,position=g.attributes.position,tri=index.count/3,buffer=new ArrayBuffer(84+tri*50),view=new DataView(buffer);const header='KlangKuppel · 80mm · watertight';for(let i=0;i<header.length;i++)view.setUint8(i,header.charCodeAt(i));view.setUint32(80,tri,true);let o=84;
+    const a=new THREE.Vector3(),b=new THREE.Vector3(),c=new THREE.Vector3(),n=new THREE.Vector3();
+    for(let i=0;i<index.count;i+=3){a.fromBufferAttribute(position,index.getX(i));b.fromBufferAttribute(position,index.getX(i+1));c.fromBufferAttribute(position,index.getX(i+2));n.subVectors(b,a).cross(new THREE.Vector3().subVectors(c,a)).normalize();for(const v of[n,a,b,c]){view.setFloat32(o,v.x,true);view.setFloat32(o+4,v.y,true);view.setFloat32(o+8,v.z,true);o+=12;}view.setUint16(o,0,true);o+=2;}
+    const blob=new Blob([buffer],{type:'model/stl'}),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download='KlangKuppel_'+new Date().toISOString().slice(0,10)+'.stl';document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),2000);showToast('STL exportiert · '+Math.round(blob.size/1024)+' KB');
+  }
+
+  function showToast(msg){toast.textContent=msg;toast.classList.add('show');clearTimeout(showToast.t);showToast.t=setTimeout(()=>toast.classList.remove('show'),2600);}
+  function bindSlider(id,key,out,fmt){const el=$(id);el.addEventListener('input',()=>{state[key]=+el.value;if(key==='sharpness'||key==='smooth')state[key]/=100;$(out).textContent=fmt(+el.value);rebuild();});}
+  bindSlider('relief','relief','reliefOut',v=>v.toFixed(1).replace('.',',')+' mm');
+  bindSlider('sharpness','sharpness','sharpnessOut',v=>v+' %');bindSlider('smooth','smooth','smoothOut',v=>v+' %');
+  bindSlider('detail','detail','detailOut',v=>['Grob','Mittel','Fein'][v]);bindSlider('baseHeight','baseHeight','baseOut',v=>v.toFixed(1).replace('.',',')+' mm');
+  $('mirror').addEventListener('change',e=>{state.mirror=e.target.checked;rebuild();});$('wire').addEventListener('change',e=>{state.wire=e.target.checked;mat.wireframe=state.wire;});
+  $('audioFile').addEventListener('change',e=>loadAudio(e.target.files[0]));$('playBtn').addEventListener('click',toggleAudio);$('exportBtn').addEventListener('click',exportSTL);
+  $('demoBtn').addEventListener('click',()=>{stopAudio();audioBuffer=null;$('playBtn').disabled=true;spectral=makeDemo(++demoSeed);rebuild();$('fileStatus').textContent='Neues Demo-Klangmuster ist aktiv';$('analysisBadge').textContent='● DEMO · SYNTHETISCHE KLANGDATEN';showToast('Neue Demoform erzeugt');});
+  const drop=$('dropZone');for(const ev of['dragenter','dragover'])drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('drag')});for(const ev of['dragleave','drop'])drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('drag')});drop.addEventListener('drop',e=>loadAudio(e.dataTransfer.files[0]));
+
+  // Pointer orbit controls, intentionally dependency-free for reliable touch use.
+  let yaw=.72,pitch=.48,distance=142,pointers=new Map(),lastPinch=0;
+  function setCamera(){pitch=Math.max(.12,Math.min(1.35,pitch));distance=Math.max(88,Math.min(240,distance));camera.position.set(Math.sin(yaw)*Math.cos(pitch)*distance,Math.sin(pitch)*distance,Math.cos(yaw)*Math.cos(pitch)*distance);camera.lookAt(0,18,0);}
+  canvas.addEventListener('pointerdown',e=>{canvas.setPointerCapture(e.pointerId);pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});});
+  canvas.addEventListener('pointermove',e=>{if(!pointers.has(e.pointerId))return;const old=pointers.get(e.pointerId);pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});const ps=[...pointers.values()];if(ps.length===1){yaw-=(e.clientX-old.x)*.009;pitch+=(e.clientY-old.y)*.007;}else if(ps.length===2){const d=Math.hypot(ps[0].x-ps[1].x,ps[0].y-ps[1].y);if(lastPinch)distance*=lastPinch/d;lastPinch=d;}setCamera();});
+  const pointerEnd=e=>{pointers.delete(e.pointerId);lastPinch=0};canvas.addEventListener('pointerup',pointerEnd);canvas.addEventListener('pointercancel',pointerEnd);canvas.addEventListener('wheel',e=>{e.preventDefault();distance*=1+Math.sign(e.deltaY)*.08;setCamera()},{passive:false});
+  function resize(){const r=canvas.getBoundingClientRect();renderer.setSize(r.width,r.height,false);camera.aspect=r.width/r.height;camera.updateProjectionMatrix();}
+  new ResizeObserver(resize).observe(canvas);setCamera();rebuild();
+  function animate(){requestAnimationFrame(animate);if(mesh&&!pointers.size)mesh.rotation.y+=.0012;renderer.render(scene,camera);}animate();
+})();
+</script>
+</body>
+</html>
