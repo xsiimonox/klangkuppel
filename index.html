@@ -47,6 +47,7 @@
     .file-row{display:flex;align-items:center;gap:8px;margin-top:10px;min-height:22px;color:#dad9e3;font-size:12px}
     .file-row .dot{width:6px;height:6px;background:var(--orange);border-radius:50%;flex:none}
     .actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0 20px}
+    .timeline{border:1px solid #3d3e52;border-radius:13px;padding:10px 11px;margin:10px 0 16px;background:linear-gradient(135deg,#202131,#161722)}.timeline label{display:flex;justify-content:space-between;gap:10px;font-size:10px;color:#d9d8e1}.timeline label b{color:var(--acid);font-variant-numeric:tabular-nums}.timeline input{width:100%;margin:7px 0 3px;accent-color:var(--violet)}.timeline small{display:flex;justify-content:space-between;color:#898a9a;font-size:8px}
     .btn{border:0;border-radius:11px;min-height:43px;padding:10px 13px;cursor:pointer;font-weight:760;transition:transform .16s,filter .16s;background:#2a2b39;color:var(--ink)}
     .btn:active{transform:scale(.98)}.btn:hover{filter:brightness(1.1)}
     .btn.acid{background:var(--acid);color:#10120c}.btn:disabled{opacity:.42;cursor:not-allowed}
@@ -85,7 +86,7 @@
 <body>
 <div class="app">
   <header>
-    <div class="brand"><div class="brand-mark" aria-hidden="true"></div><div>KlangKuppel<small>Music → Matter Lab · v1.7.1</small></div></div>
+    <div class="brand"><div class="brand-mark" aria-hidden="true"></div><div>KlangKuppel<small>Music → Matter Lab · v1.8.0</small></div></div>
     <div class="header-note">Alles bleibt auf diesem Gerät</div>
   </header>
   <main>
@@ -130,6 +131,11 @@ lead: x--x--x-</textarea>
       <div class="actions">
         <button class="btn" id="demoBtn">↻ Neue Demo</button>
         <button class="btn" id="playBtn" disabled>▶ Anhören</button>
+      </div>
+      <div class="timeline" aria-label="Song-Timeline">
+        <label for="timeline"><span>⌁ Song-Timeline · Form-Fokus</span><b id="timelineOut">Demo · 50 %</b></label>
+        <input id="timeline" type="range" min="0" max="1000" value="500" step="1" aria-label="Position im Song für die 3D-Ansicht">
+        <small><span>Anfang</span><span>Gewählter Songabschnitt für die Kuppel</span><span>Ende</span></small>
       </div>
 
       <section class="section">
@@ -221,7 +227,7 @@ lead: x--x--x-</textarea>
   };
   const fromString=s=>Array.from({length:16},(_,i)=>(s[i%s.length]||'-').toLowerCase()==='x');
   const patterns={kick:fromString('x---x---'),snare:fromString('----x---'),hat:fromString('x-x-x-x-'),bass:fromString('x---x-x-'),lead:fromString('x--x--x-')};
-  let activeMode='discover',patternRendering=false;
+  let activeMode='discover',patternRendering=false,timelineFocus=.5,timelineRaf=0,audioOffset=0,audioStartedAt=0;
   let labPlaying=false,labTimer=null,labOutput=null,masterVolume=.85,nextStep=0,nextTime=0,shapeRevision=0,shapeTimer=null,audioAnalyser=null,audioData=null,audioEnergy=0,lastBeatTime=0;
   function triggerFluidStep(step,cfg){const active=cfg.tracks.filter(key=>patterns[key][step]);if(active.length)fluidPulse=Math.min(1.6,fluidPulse+.52+active.length*.12);}
   function connectAudioAnalysis(node){audioAnalyser=audioCtx.createAnalyser();audioAnalyser.fftSize=64;audioAnalyser.smoothingTimeConstant=.62;audioData=new Uint8Array(audioAnalyser.frequencyBinCount);node.connect(audioAnalyser).connect(audioCtx.destination);}
@@ -235,6 +241,7 @@ lead: x--x--x-</textarea>
     while(nextTime<audioCtx.currentTime+.04){const step=nextStep%cfg.steps;
       for(const key of cfg.tracks)if(patterns[key][step])scheduleNote(audioCtx,labOutput,nextTime,key,step,dur);
       triggerFluidStep(step,cfg);
+      timelineFocus=step/cfg.steps;updateTimelineLabel();
       document.querySelectorAll('.step').forEach(b=>b.classList.toggle('playing',+b.dataset.step===step));
       nextStep++;nextTime+=dur;
     }
@@ -243,7 +250,7 @@ lead: x--x--x-</textarea>
     stopAudio();
     try{await unlockAudio();if(audioCtx.state!=='running')throw new Error('Audio ist auf diesem Gerät noch gesperrt. Bitte erneut auf Play tippen.');
       labOutput=audioCtx.createGain();labOutput.gain.value=masterVolume;const limiter=audioCtx.createDynamicsCompressor();limiter.threshold.value=-18;limiter.knee.value=12;limiter.ratio.value=4;limiter.attack.value=.003;limiter.release.value=.2;labOutput.connect(limiter);connectAudioAnalysis(limiter);
-      labPlaying=true;playing=true;nextStep=0;nextTime=audioCtx.currentTime+.025;
+      const cfg=modeConfig[activeMode];labPlaying=true;playing=true;nextStep=Math.floor(timelineFocus*cfg.steps);nextTime=audioCtx.currentTime+.025;
       setFluidActive(true);
       $('listenPattern').textContent='■ Stoppen · Ton läuft';$('playBtn').textContent='■ Stoppen';$('fileStatus').textContent='Ton läuft · '+activeModeLabel()+' · '+$('tempo').value+' BPM';
       scheduleLab();labTimer=setInterval(scheduleLab,15);queueLiveShape();
@@ -302,7 +309,7 @@ lead: x--x--x-</textarea>
   }
 
   function sampleMap(map,u,v){
-    const F=map.length,T=map[0].length; let x=(state.mirror?1-u:u)*T; x=(x%T+T)%T; const y=Math.max(0,Math.min(F-1,v*(F-1)));
+    const F=map.length,T=map[0].length,windowSize=labShape?.42:.32;let focus=Math.max(0,Math.min(1,timelineFocus+(u-.5)*windowSize));if(state.mirror)focus=1-focus;const x=focus*(T-1),y=Math.max(0,Math.min(F-1,v*(F-1)));
     const x0=Math.floor(x)%T,x1=(x0+1)%T,y0=Math.floor(y),y1=Math.min(F-1,y0+1),fx=x-Math.floor(x),fy=y-y0;
     return (map[y0][x0]*(1-fx)+map[y0][x1]*fx)*(1-fy)+(map[y1][x0]*(1-fx)+map[y1][x1]*fx)*fy;
   }
@@ -411,14 +418,17 @@ lead: x--x--x-</textarea>
     $('progress').style.display='block';$('progress').firstElementChild.style.width='5%';$('fileStatus').textContent='Audio wird gelesen …';
     try{audioCtx=audioCtx||new(window.AudioContext||window.webkitAudioContext)();const data=await file.arrayBuffer();audioBuffer=await audioCtx.decodeAudioData(data.slice(0));
       if(audioBuffer.duration>300)throw new Error('Bitte ein Musikstück mit maximal 5 Minuten verwenden.');
-      $('fileStatus').textContent='Klang wird analysiert …';spectral=await analyze(audioBuffer);labShape=null;rebuild();$('fileStatus').textContent=file.name+' · '+formatTime(audioBuffer.duration);$('analysisBadge').textContent='● ANALYSE · '+file.name.toUpperCase();$('playBtn').disabled=false;showToast('Musik erfolgreich in Form übersetzt');
+      $('fileStatus').textContent='Klang wird analysiert …';spectral=await analyze(audioBuffer);labShape=null;audioOffset=0;setTimelineFocus(.5,true);$('fileStatus').textContent=file.name+' · '+formatTime(audioBuffer.duration);$('analysisBadge').textContent='● ANALYSE · '+file.name.toUpperCase();$('playBtn').disabled=false;showToast('Musik erfolgreich in Form übersetzt');
     }catch(err){console.error(err);$('fileStatus').textContent='Datei konnte nicht analysiert werden';showToast(err.message||'Dieses Audioformat wird nicht unterstützt');}
     finally{setTimeout(()=>{$('progress').style.display='none';},500);}
   }
 
   function formatTime(s){return Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0');}
-  function stopAudio(){labPlaying=false;clearInterval(labTimer);if(labOutput){labOutput.disconnect();labOutput=null;}document.querySelectorAll('.step.playing').forEach(b=>b.classList.remove('playing'));if(source){source.onended=null;try{source.stop()}catch(e){}source=null;}playing=false;fluidPulse=0;setFluidActive(false);$('playBtn').textContent='▶ Anhören';$('listenPattern').textContent='▶ Play · Live';}
-  async function toggleAudio(){if(playing){stopAudio();return;}if(!audioBuffer){showToast('Noch keine Musik zum Abspielen');return;}try{await unlockAudio();source=audioCtx.createBufferSource();const gain=audioCtx.createGain();gain.gain.value=masterVolume;source.buffer=audioBuffer;source.connect(gain);connectAudioAnalysis(gain);source.onended=stopAudio;source.start(0);playing=true;setFluidActive(true);$('playBtn').textContent='■ Stoppen';$('listenPattern').textContent='■ Stoppen · Ton läuft';$('analysisBadge').textContent='● FLÜSSIGE KUPPEL · AUDIO';}catch(err){console.error(err);showToast(err.message||'Ton konnte nicht gestartet werden');}}
+  function updateTimelineLabel(){const value=Math.round(timelineFocus*1000);$('timeline').value=value;$('timelineOut').textContent=audioBuffer&&!labShape?formatTime(timelineFocus*audioBuffer.duration)+' / '+formatTime(audioBuffer.duration):'Loop · '+Math.round(timelineFocus*100)+' %';}
+  function setTimelineFocus(value,rebuildNow=false){timelineFocus=Math.max(0,Math.min(1,value));updateTimelineLabel();if(rebuildNow)rebuild();else if(!timelineRaf)timelineRaf=requestAnimationFrame(()=>{timelineRaf=0;rebuild();});}
+  function playUploadedAt(offset){if(!audioBuffer)return;if(source){source.onended=null;try{source.stop()}catch(e){}}source=audioCtx.createBufferSource();const gain=audioCtx.createGain();gain.gain.value=masterVolume;source.buffer=audioBuffer;source.connect(gain);connectAudioAnalysis(gain);audioOffset=Math.max(0,Math.min(audioBuffer.duration-.01,offset));audioStartedAt=audioCtx.currentTime;source.onended=()=>{source=null;playing=false;audioOffset=0;setFluidActive(false);$('playBtn').textContent='▶ Anhören';$('listenPattern').textContent='▶ Play · Live';};source.start(0,audioOffset);}
+  function stopAudio(){labPlaying=false;clearInterval(labTimer);if(labOutput){labOutput.disconnect();labOutput=null;}document.querySelectorAll('.step.playing').forEach(b=>b.classList.remove('playing'));if(source){if(audioBuffer&&audioStartedAt)audioOffset=Math.min(audioBuffer.duration,audioOffset+audioCtx.currentTime-audioStartedAt);source.onended=null;try{source.stop()}catch(e){}source=null;}playing=false;fluidPulse=0;setFluidActive(false);$('playBtn').textContent='▶ Anhören';$('listenPattern').textContent='▶ Play · Live';}
+  async function toggleAudio(){if(playing){stopAudio();return;}if(!audioBuffer){showToast('Noch keine Musik zum Abspielen');return;}try{await unlockAudio();playUploadedAt(audioOffset);playing=true;setFluidActive(true);$('playBtn').textContent='■ Stoppen';$('listenPattern').textContent='■ Stoppen · Ton läuft';$('analysisBadge').textContent='● FLÜSSIGE KUPPEL · AUDIO';}catch(err){console.error(err);showToast(err.message||'Ton konnte nicht gestartet werden');}}
 
   function exportSTL(){
     if(!mesh)return;const g=mesh.geometry,index=g.index,position=g.attributes.position,tri=index.count/3,buffer=new ArrayBuffer(84+tri*50),view=new DataView(buffer);const header='KlangKuppel · 80mm · watertight';for(let i=0;i<header.length;i++)view.setUint8(i,header.charCodeAt(i));view.setUint32(80,tri,true);let o=84;
@@ -439,6 +449,8 @@ lead: x--x--x-</textarea>
   $('audioFile').addEventListener('change',e=>loadAudio(e.target.files[0]));$('playBtn').addEventListener('click',()=>{try{unlockAudio().catch(()=>{});}catch(err){showToast(err.message);}toggleAudio();});$('exportBtn').addEventListener('click',exportSTL);
   document.querySelectorAll('.mode-tab').forEach(tab=>tab.addEventListener('click',()=>{activeMode=tab.dataset.mode;document.querySelectorAll('.mode-tab').forEach(t=>{t.classList.toggle('active',t===tab);t.setAttribute('aria-selected',t===tab?'true':'false');});if(activeMode==='code')syncCodeFromPattern();renderSequencer();showToast('Modus: '+activeModeLabel());}));
   $('tempo').addEventListener('input',e=>$('tempoOut').textContent=e.target.value+' BPM');
+  $('timeline').addEventListener('input',e=>setTimelineFocus(+e.target.value/1000));
+  $('timeline').addEventListener('change',e=>{const position=+e.target.value/1000;timelineFocus=position;updateTimelineLabel();if(labPlaying||labShape){const cfg=modeConfig[activeMode];nextStep=Math.floor(position*cfg.steps);if(labPlaying)nextTime=audioCtx.currentTime+.02;showToast('Loop-Fokus: Schritt '+(nextStep+1));}else if(audioBuffer){audioOffset=position*audioBuffer.duration;if(playing)playUploadedAt(audioOffset);showToast('Songposition: '+formatTime(audioOffset));}});
   $('volume').addEventListener('input',e=>{masterVolume=+e.target.value/100;$('volumeOut').textContent=e.target.value+' %';if(labOutput&&audioCtx)labOutput.gain.setTargetAtTime(masterVolume,audioCtx.currentTime,.015);});
   $('randomPattern').addEventListener('click',()=>{const cfg=modeConfig[activeMode];for(const key of cfg.tracks)for(let i=0;i<cfg.steps;i++){const density=key==='hat'?.48:key==='kick'?.28:.2;patterns[key][i]=Math.random()<density;}if(activeMode==='code')syncCodeFromPattern();renderSequencer();});
   $('clearPattern').addEventListener('click',()=>{const cfg=modeConfig[activeMode];for(const key of cfg.tracks)for(let i=0;i<cfg.steps;i++)patterns[key][i]=false;if(activeMode==='code')syncCodeFromPattern();renderSequencer();});
@@ -472,7 +484,7 @@ lead: x--x--x-</textarea>
   $('fluidDome').addEventListener('click',()=>{fluidOn=!fluidOn;$('fluidDome').classList.toggle('active',fluidOn);$('fluidDome').setAttribute('aria-pressed',String(fluidOn));setFluidActive(playing);showToast(fluidOn?'Flüssige Kuppel an':'Flüssige Kuppel aus');});
   function resize(){const r=canvas.getBoundingClientRect();if(!r.width||!r.height)return;renderer.setSize(r.width,r.height,false);camera.aspect=r.width/r.height;camera.updateProjectionMatrix();setCamera();}
   new ResizeObserver(resize).observe(canvas);setCamera();renderSequencer();rebuild();
-  function animate(time){requestAnimationFrame(animate);if(mesh&&autoSpin&&!pointers.size)modelGroup.rotateY(.0022);updateAudioAnalysis(time);updateFluidDome(time);renderer.render(scene,camera);}animate();
+  function animate(time){requestAnimationFrame(animate);if(mesh&&autoSpin&&!pointers.size)modelGroup.rotateY(.0022);if(playing&&source&&audioBuffer&&audioStartedAt){const position=Math.min(.999,(audioOffset+audioCtx.currentTime-audioStartedAt)/audioBuffer.duration);timelineFocus=position;updateTimelineLabel();if(!animate.lastModelUpdate||time-animate.lastModelUpdate>700){animate.lastModelUpdate=time;rebuild();}}updateAudioAnalysis(time);updateFluidDome(time);renderer.render(scene,camera);}animate();
 })();
 </script>
 </body>
