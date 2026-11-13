@@ -37,7 +37,7 @@
     .lab-controls{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end;margin-top:10px}.tempo label{display:flex;justify-content:space-between;font-size:9px;color:var(--muted)}.tempo input{width:100%;accent-color:var(--acid)}
     .lab-mini{display:flex;gap:5px}.mini-btn{border:1px solid var(--line);background:#2a2b39;color:#ddd;border-radius:8px;padding:7px 8px;font-size:10px;cursor:pointer}
     .lab-actions{display:grid;grid-template-columns:1fr 1.2fr;gap:6px;margin-top:9px}.lab-actions .btn{min-height:39px;font-size:11px;padding:8px}.lab-actions .make{background:var(--acid);color:#11130d}
-    .code-box{display:none}.code-box.visible{display:block}.code-box textarea{width:100%;min-height:100px;resize:vertical;background:#10111a;border:1px solid #404155;color:#dfffa8;border-radius:9px;padding:9px;font:10px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace}.code-foot{display:flex;justify-content:space-between;align-items:center;margin-top:6px;font-size:9px;color:var(--muted)}.code-foot a{color:var(--acid)}
+    .code-box{display:none}.code-box.visible{display:block}.code-box textarea{width:100%;min-height:120px;resize:vertical;background:#10111a;border:1px solid #404155;color:#dfffa8;border-radius:9px;padding:9px;font:10px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace}.code-foot{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:6px;font-size:9px;color:var(--muted)}.code-foot a{color:var(--acid)}.code-status{margin:7px 0 10px;color:#c6c5d0;font-size:9px;line-height:1.35}.code-status.ok{color:var(--acid)}
     .drop{position:relative;border:1px dashed #646579;border-radius:16px;padding:16px;background:linear-gradient(135deg,#202231,#171822);transition:.2s;cursor:pointer}
     .drop.drag{border-color:var(--acid);background:#b7f34b10;transform:translateY(-2px)}
     .drop input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%}
@@ -85,7 +85,7 @@
 <body>
 <div class="app">
   <header>
-    <div class="brand"><div class="brand-mark" aria-hidden="true"></div><div>KlangKuppel<small>Music → Matter Lab · v1.4.2</small></div></div>
+    <div class="brand"><div class="brand-mark" aria-hidden="true"></div><div>KlangKuppel<small>Music → Matter Lab · v1.5.0</small></div></div>
     <div class="header-note">Alles bleibt auf diesem Gerät</div>
   </header>
   <main>
@@ -109,7 +109,8 @@
 snare: ----x---
 hat: x-x-x-x-
 lead: x--x--x-</textarea>
-          <div class="code-foot"><span>x = Klang · – = Pause</span><a href="https://strudel.cc/" target="_blank" rel="noopener">Strudel öffnen ↗</a></div>
+          <div class="code-foot"><span>Pattern oder echter Strudel-Code</span><a href="https://strudel.cc/" target="_blank" rel="noopener">Strudel öffnen ↗</a></div>
+          <p class="code-status" id="codeStatus">Strudel: <code>note(...)</code>, <code>sound(...)</code> und <code>.tempo(...)</code> werden in Formenspuren übersetzt.</p>
         </div>
         <div class="lab-controls">
           <div class="tempo"><label for="tempo"><span>Tempo</span><b id="tempoOut">100 BPM</b></label><input id="tempo" type="range" min="60" max="160" value="100" step="1"></div>
@@ -210,7 +211,7 @@ lead: x--x--x-</textarea>
   const modeConfig={
     discover:{steps:8,tracks:['kick','snare','hat','lead'],help:'Tippe auf die bunten Felder: Jede Zeile ist ein Klang, jede Spalte ein Zeitpunkt.'},
     create:{steps:16,tracks:['kick','snare','hat','bass','lead'],help:'Baue einen 16-Schritt-Loop. Verändere Tempo und Rhythmus und vergleiche die entstehenden Formen.'},
-    code:{steps:8,tracks:['kick','snare','hat','bass','lead'],help:'Schreibe dein Pattern als Code: x spielt einen Klang, – oder - erzeugt eine Pause.'}
+    code:{steps:8,tracks:['kick','snare','hat','bass','lead'],help:'Füge einfachen Pattern-Code oder Strudel ein. KlangKuppel erkennt Tempo, Noten und Drum-Sounds und übersetzt sie automatisch.'}
   };
   const fromString=s=>Array.from({length:16},(_,i)=>(s[i%s.length]||'-').toLowerCase()==='x');
   const patterns={kick:fromString('x---x---'),snare:fromString('----x---'),hat:fromString('x-x-x-x-'),bass:fromString('x---x-x-'),lead:fromString('x--x--x-')};
@@ -256,8 +257,15 @@ lead: x--x--x-</textarea>
       for(let step=0;step<cfg.steps;step++){const b=document.createElement('button');b.className='step'+(patterns[key][step]?' on':'');b.dataset.track=key;b.dataset.step=step;b.setAttribute('aria-label',tracks[key].name+', Schritt '+(step+1)+(patterns[key][step]?' aktiv':' inaktiv'));b.addEventListener('click',()=>{patterns[key][step]=!patterns[key][step];b.classList.toggle('on',patterns[key][step]);b.setAttribute('aria-label',tracks[key].name+', Schritt '+(step+1)+(patterns[key][step]?' aktiv':' inaktiv'));if(activeMode==='code')syncCodeFromPattern();});row.appendChild(b);}seq.appendChild(row);
     }
   }
-  function syncCodeFromPattern(){const cfg=modeConfig.code;$('patternCode').value=cfg.tracks.map(k=>k+': '+patterns[k].slice(0,cfg.steps).map(v=>v?'x':'-').join('')).join('\n');}
-  function applyCode(){const cfg=modeConfig.code,lines=$('patternCode').value.split(/\n/);for(const line of lines){const m=line.match(/^\s*(kick|snare|hat|bass|lead)\s*:\s*([xX.\-–_\s]+)\s*$/);if(!m)continue;const chars=m[2].replace(/\s/g,'');for(let i=0;i<cfg.steps;i++)patterns[m[1]][i]=(chars[i%chars.length]||'-').toLowerCase()==='x';}renderSequencer();}
+  function syncCodeFromPattern(){const cfg=modeConfig.code;$('patternCode').value=cfg.tracks.map(k=>k+': '+patterns[k].slice(0,cfg.steps).map(v=>v?'x':'-').join('')).join('\n');$('codeStatus').classList.remove('ok');$('codeStatus').textContent='Einfaches Pattern aktiv: x = Klang · - = Pause.';}
+  function markStrudelEvents(key,units,steps){units.forEach((unit,index)=>{if(!unit||unit==='~'||unit==='-')return;const step=Math.min(steps-1,Math.floor(index/units.length*steps));patterns[key][step]=true;});}
+  function strudelUnits(sequence){return(sequence.match(/\[[^\]]+\]|~|[^\s]+/g)||[]).map(unit=>unit.replace(/\*\d+(?:\.\d+)?/g,'').trim());}
+  function applyStrudelCode(code){if(!/(?:\bnote|\bsound|\bs)\s*\(/.test(code))return false;const cfg=modeConfig.code,steps=cfg.steps;for(const key of cfg.tracks)for(let i=0;i<steps;i++)patterns[key][i]=false;let found=0;
+    for(const match of code.matchAll(/\bnote\s*\(\s*["']([^"']+)["']/gi)){const sequence=match[1],units=strudelUnits(sequence),low=/[a-g](?:s|#|b|f)?[0-3]\b/i.test(sequence),key=low?'bass':'lead';markStrudelEvents(key,units,steps);found+=units.filter(unit=>unit&&unit!=='~').length;}
+    for(const match of code.matchAll(/\b(?:sound|s)\s*\(\s*["']([^"']+)["']/gi)){const units=strudelUnits(match[1]);units.forEach((unit,index)=>{if(unit==='~'||unit==='-')return;const step=Math.min(steps-1,Math.floor(index/units.length*steps)),samples=unit.replace(/[\[\],]/g,' ').split(/\s+/);for(const sample of samples){const sound=sample.toLowerCase();if(/^(bd|kick|bassdrum|lt|mt|ht)$/.test(sound)){patterns.kick[step]=true;found++;}else if(/^(sd|sn|cp|clap|rim)$/.test(sound)){patterns.snare[step]=true;found++;}else if(/^(hh|oh|ch|hat)$/.test(sound)){patterns.hat[step]=true;found++;}else if(sound) {patterns.hat[step]=true;found++;}}});}
+    const tempo=code.match(/\.tempo\s*\(\s*(\d+(?:\.\d+)?)/i);if(tempo){const bpm=Math.max(60,Math.min(160,Math.round(+tempo[1])));$('tempo').value=bpm;$('tempoOut').textContent=bpm+' BPM';}
+    if(!found){$('codeStatus').classList.remove('ok');$('codeStatus').textContent='Strudel erkannt, aber keine übersetzbaren Noten oder Drum-Sounds gefunden.';return true;}renderSequencer();$('codeStatus').classList.add('ok');$('codeStatus').textContent='✓ Strudel erkannt · '+found+' Klänge in Bassdrum, Snare, Hi-Hat, Bass und Melodie übersetzt.';return true;}
+  function applyCode(){const code=$('patternCode').value;if(applyStrudelCode(code))return;const cfg=modeConfig.code,lines=code.split(/\n/);for(const line of lines){const m=line.match(/^\s*(kick|snare|hat|bass|lead)\s*:\s*([xX.\-–_\s]+)\s*$/);if(!m)continue;const chars=m[2].replace(/\s/g,'');for(let i=0;i<cfg.steps;i++)patterns[m[1]][i]=(chars[i%chars.length]||'-').toLowerCase()==='x';}renderSequencer();$('codeStatus').classList.remove('ok');$('codeStatus').textContent='Einfaches Pattern aktiv: x = Klang · - = Pause.';}
 
   function noiseBuffer(ctx,duration=.5){const b=ctx.createBuffer(1,Math.ceil(ctx.sampleRate*duration),ctx.sampleRate),d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;return b;}
   function scheduleKick(ctx,out,t){const o=ctx.createOscillator(),g=ctx.createGain();o.type='sine';o.frequency.setValueAtTime(150,t);o.frequency.exponentialRampToValueAtTime(42,t+.18);g.gain.setValueAtTime(.85,t);g.gain.exponentialRampToValueAtTime(.001,t+.28);o.connect(g).connect(out);o.start(t);o.stop(t+.3);}
