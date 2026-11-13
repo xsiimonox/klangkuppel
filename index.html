@@ -85,7 +85,7 @@
 <body>
 <div class="app">
   <header>
-    <div class="brand"><div class="brand-mark" aria-hidden="true"></div><div>KlangKuppel<small>Music → Matter Lab · v1.5.0</small></div></div>
+    <div class="brand"><div class="brand-mark" aria-hidden="true"></div><div>KlangKuppel<small>Music → Matter Lab · v1.6.0</small></div></div>
     <div class="header-note">Alles bleibt auf diesem Gerät</div>
   </header>
   <main>
@@ -118,7 +118,7 @@ lead: x--x--x-</textarea>
         </div>
         <div class="tempo" style="margin-top:8px"><label for="volume"><span>Lautstärke</span><b id="volumeOut">85 %</b></label><input id="volume" type="range" min="0" max="100" value="85" step="1"></div>
         <div class="lab-actions"><button class="btn" id="listenPattern">▶ Play · Live</button><button class="btn make" id="makeForm">↻ 3D aktualisieren</button></div>
-        <p class="mode-help" style="margin:9px 0 0">Play wiederholt deinen Loop. Änderungen hörst du beim nächsten Schritt; die 3D-Form folgt automatisch.</p>
+        <p class="mode-help" style="margin:9px 0 0">Play wiederholt deinen Loop. Änderungen hörst du beim nächsten Schritt; die 3D-Form folgt automatisch. ✦ Live-Visuals reagieren zusätzlich auf jeden Beat und werden nicht exportiert.</p>
       </section>
 
       <div class="drop" id="dropZone">
@@ -168,6 +168,7 @@ lead: x--x--x-</textarea>
         <button class="view-btn" data-view="top">↑ Oben</button>
         <button class="view-btn" data-view="bottom">↓ Unten</button>
         <button class="view-btn" id="turntable" aria-pressed="false">⌗ Boden</button>
+        <button class="view-btn active" id="liveVisuals" aria-pressed="true">✦ Live-Visuals</button>
         <button class="view-btn" data-view="reset">↺ Reset</button>
       </div>
       <div class="axis-key" aria-hidden="true"><span class="x">X</span><span class="y">Y</span><span class="z">Z</span></div>
@@ -199,6 +200,7 @@ lead: x--x--x-</textarea>
   const floor=new THREE.Mesh(new THREE.CircleGeometry(74,96),new THREE.MeshBasicMaterial({color:0x11121b,transparent:true,opacity:.72,side:THREE.DoubleSide}));floor.rotation.x=-Math.PI/2;floor.position.y=-2.8;floor.visible=false;scene.add(floor);
   const grid=new THREE.GridHelper(150,15,0x343547,0x232431);grid.position.y=-2.5;grid.visible=false;scene.add(grid);
   const modelGroup=new THREE.Group();modelGroup.position.y=18;modelGroup.rotation.set(.55,.55,.04);scene.add(modelGroup);
+  const liveVisualGroup=new THREE.Group();modelGroup.add(liveVisualGroup);
 
   let mesh, audioBuffer=null, source=null, audioCtx=null, playing=false, demoSeed=2;
   let spectral=makeDemo(demoSeed),labShape=null,geometryInfo={triangles:0,maxHeight:46};
@@ -216,7 +218,14 @@ lead: x--x--x-</textarea>
   const fromString=s=>Array.from({length:16},(_,i)=>(s[i%s.length]||'-').toLowerCase()==='x');
   const patterns={kick:fromString('x---x---'),snare:fromString('----x---'),hat:fromString('x-x-x-x-'),bass:fromString('x---x-x-'),lead:fromString('x--x--x-')};
   let activeMode='discover',patternRendering=false;
-  let labPlaying=false,labTimer=null,labOutput=null,masterVolume=.85,nextStep=0,nextTime=0,shapeRevision=0,shapeTimer=null;
+  let labPlaying=false,labTimer=null,labOutput=null,masterVolume=.85,nextStep=0,nextTime=0,shapeRevision=0,shapeTimer=null,visualAnalyser=null,visualData=null,lastVisualEnergy=0,lastVisualBeat=0,liveVisualsOn=true;
+  const visualPool=[],visualColors={kick:0xff704c,snare:0xffd45a,hat:0xb7f34b,bass:0x48d7c8,lead:0x9a87ff,generic:0xf5f3ef};
+  function makeVisual(){const mesh=new THREE.Mesh(new THREE.TorusGeometry(1,.14,10,48),new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0,depthWrite:false,depthTest:false,toneMapped:false,side:THREE.DoubleSide,blending:THREE.NormalBlending}));mesh.renderOrder=4;mesh.visible=false;liveVisualGroup.add(mesh);return{mesh,life:0,kind:'generic',spin:0};}
+  for(let i=0;i<42;i++)visualPool.push(makeVisual());
+  function emitVisual(kind,step=0,total=8,strength=1){if(!liveVisualsOn)return;const item=visualPool.reduce((best,current)=>current.life<best.life?current:best,visualPool[0]),angle=step/total*Math.PI*2;item.life=1;item.kind=kind;item.spin=(kind==='hat'?5:kind==='lead'?-3:kind==='snare'?2:.7)*(Math.random()>.5?1:-1);item.mesh.visible=true;item.mesh.material.color.setHex(visualColors[kind]||visualColors.generic);item.mesh.material.opacity=1;item.mesh.position.set(kind==='lead'?Math.cos(angle)*18:0,kind==='kick'?18:kind==='bass'?14:kind==='snare'?16:15,kind==='lead'?Math.sin(angle)*18:0);item.mesh.rotation.set(kind==='kick'?Math.PI/2:0,kind==='bass'?Math.PI/2:angle,kind==='hat'?angle:0);const base=kind==='kick'?.7:kind==='snare'?.34:kind==='hat'?.19:kind==='bass'?.55:.28;item.mesh.scale.setScalar(base*strength);}
+  function triggerVisualStep(step,cfg){const active=cfg.tracks.filter(key=>patterns[key][step]);for(const key of active){emitVisual(key,step,cfg.steps,key==='kick'?1.45:1);if(key==='snare')for(let i=0;i<5;i++)emitVisual('snare',(step+i*.13)%cfg.steps,cfg.steps,.45);if(key==='hat')for(let i=0;i<2;i++)emitVisual('hat',(step+i*.18)%cfg.steps,cfg.steps,.6);if(key==='lead')for(let i=0;i<2;i++)emitVisual('lead',(step+i*.1)%cfg.steps,cfg.steps,.6);}}
+  function connectVisualAudio(node){visualAnalyser=audioCtx.createAnalyser();visualAnalyser.fftSize=64;visualAnalyser.smoothingTimeConstant=.62;visualData=new Uint8Array(visualAnalyser.frequencyBinCount);node.connect(visualAnalyser).connect(audioCtx.destination);}
+  function updateLiveVisuals(time){if(playing&&visualAnalyser&&visualData){visualAnalyser.getByteFrequencyData(visualData);const energy=visualData.reduce((sum,value)=>sum+value,0)/visualData.length/255;if(energy>.12&&energy-lastVisualEnergy>.055&&time-lastVisualBeat>130){emitVisual('generic',Math.random()*8,8,.55+energy);lastVisualBeat=time;}lastVisualEnergy=lastVisualEnergy*.82+energy*.18;}for(const item of visualPool){if(item.life<=0)continue;item.life-=.012;const age=1-item.life,scale=(item.kind==='kick'?1+age*16:item.kind==='bass'?1+age*10:1+age*6);item.mesh.scale.setScalar(Math.max(.001,scale*(item.kind==='hat'?.19:item.kind==='snare'?.34:item.kind==='lead'?.28:item.kind==='bass'?.55:.7)));item.mesh.rotation.z+=item.spin*.025;item.mesh.material.opacity=Math.max(0,item.life*.95);if(item.life<=0)item.mesh.visible=false;}liveVisualGroup.visible=liveVisualsOn;liveVisualGroup.rotation.y+=playing?.0015:0;}
   function unlockAudio(){const AudioEngine=window.AudioContext||window.webkitAudioContext;if(!AudioEngine)throw new Error('Web Audio wird von diesem Browser nicht unterstützt.');if(!audioCtx||audioCtx.state==='closed')audioCtx=new AudioEngine({latencyHint:'interactive'});const silent=audioCtx.createBufferSource();silent.buffer=audioCtx.createBuffer(1,1,audioCtx.sampleRate);silent.connect(audioCtx.destination);silent.start(0);const resumed=audioCtx.resume();return resumed||Promise.resolve();}
   function scheduleNote(ctx,out,t,key,step,dur){if(key==='kick')scheduleKick(ctx,out,t);else if(key==='snare'||key==='hat')scheduleNoise(ctx,out,t,key);else scheduleTone(ctx,out,t,key,step,dur*.92);}
   function scheduleLab(){
@@ -225,6 +234,7 @@ lead: x--x--x-</textarea>
     const cfg=modeConfig[activeMode],dur=60/+$('tempo').value/4;
     while(nextTime<audioCtx.currentTime+.04){const step=nextStep%cfg.steps;
       for(const key of cfg.tracks)if(patterns[key][step])scheduleNote(audioCtx,labOutput,nextTime,key,step,dur);
+      triggerVisualStep(step,cfg);
       document.querySelectorAll('.step').forEach(b=>b.classList.toggle('playing',+b.dataset.step===step));
       nextStep++;nextTime+=dur;
     }
@@ -232,7 +242,7 @@ lead: x--x--x-</textarea>
   async function startLab(){
     stopAudio();
     try{await unlockAudio();if(audioCtx.state!=='running')throw new Error('Audio ist auf diesem Gerät noch gesperrt. Bitte erneut auf Play tippen.');
-      labOutput=audioCtx.createGain();labOutput.gain.value=masterVolume;const limiter=audioCtx.createDynamicsCompressor();limiter.threshold.value=-18;limiter.knee.value=12;limiter.ratio.value=4;limiter.attack.value=.003;limiter.release.value=.2;labOutput.connect(limiter).connect(audioCtx.destination);
+      labOutput=audioCtx.createGain();labOutput.gain.value=masterVolume;const limiter=audioCtx.createDynamicsCompressor();limiter.threshold.value=-18;limiter.knee.value=12;limiter.ratio.value=4;limiter.attack.value=.003;limiter.release.value=.2;labOutput.connect(limiter);connectVisualAudio(limiter);
       labPlaying=true;playing=true;nextStep=0;nextTime=audioCtx.currentTime+.025;
       $('listenPattern').textContent='■ Stoppen · Ton läuft';$('playBtn').textContent='■ Stoppen';$('fileStatus').textContent='Ton läuft · '+activeModeLabel()+' · '+$('tempo').value+' BPM';
       scheduleLab();labTimer=setInterval(scheduleLab,15);queueLiveShape();
@@ -407,7 +417,7 @@ lead: x--x--x-</textarea>
 
   function formatTime(s){return Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0');}
   function stopAudio(){labPlaying=false;clearInterval(labTimer);if(labOutput){labOutput.disconnect();labOutput=null;}document.querySelectorAll('.step.playing').forEach(b=>b.classList.remove('playing'));if(source){source.onended=null;try{source.stop()}catch(e){}source=null;}playing=false;$('playBtn').textContent='▶ Anhören';$('listenPattern').textContent='▶ Play · Live';}
-  async function toggleAudio(){if(playing){stopAudio();return;}if(!audioBuffer){showToast('Noch keine Musik zum Abspielen');return;}try{await unlockAudio();source=audioCtx.createBufferSource();const gain=audioCtx.createGain();gain.gain.value=masterVolume;source.buffer=audioBuffer;source.connect(gain).connect(audioCtx.destination);source.onended=stopAudio;source.start(0);playing=true;$('playBtn').textContent='■ Stoppen';$('listenPattern').textContent='■ Stoppen · Ton läuft';}catch(err){console.error(err);showToast(err.message||'Ton konnte nicht gestartet werden');}}
+  async function toggleAudio(){if(playing){stopAudio();return;}if(!audioBuffer){showToast('Noch keine Musik zum Abspielen');return;}try{await unlockAudio();source=audioCtx.createBufferSource();const gain=audioCtx.createGain();gain.gain.value=masterVolume;source.buffer=audioBuffer;source.connect(gain);connectVisualAudio(gain);source.onended=stopAudio;source.start(0);playing=true;$('playBtn').textContent='■ Stoppen';$('listenPattern').textContent='■ Stoppen · Ton läuft';$('analysisBadge').textContent='● LIVE-VISUALS · AUDIO';}catch(err){console.error(err);showToast(err.message||'Ton konnte nicht gestartet werden');}}
 
   function exportSTL(){
     if(!mesh)return;const g=mesh.geometry,index=g.index,position=g.attributes.position,tri=index.count/3,buffer=new ArrayBuffer(84+tri*50),view=new DataView(buffer);const header='KlangKuppel · 80mm · watertight';for(let i=0;i<header.length;i++)view.setUint8(i,header.charCodeAt(i));view.setUint32(80,tri,true);let o=84;
@@ -458,9 +468,10 @@ lead: x--x--x-</textarea>
   document.querySelectorAll('[data-view]').forEach(b=>b.addEventListener('click',()=>setView(b.dataset.view)));
   $('autoRotate').addEventListener('click',()=>{autoSpin=!autoSpin;$('autoRotate').classList.toggle('active',autoSpin);$('autoRotate').setAttribute('aria-pressed',String(autoSpin));});
   $('turntable').addEventListener('click',()=>{const show=!grid.visible;grid.visible=floor.visible=show;$('turntable').classList.toggle('active',show);$('turntable').setAttribute('aria-pressed',String(show));});
+  $('liveVisuals').addEventListener('click',()=>{liveVisualsOn=!liveVisualsOn;$('liveVisuals').classList.toggle('active',liveVisualsOn);$('liveVisuals').setAttribute('aria-pressed',String(liveVisualsOn));if(!liveVisualsOn)for(const item of visualPool){item.life=0;item.mesh.visible=false;}showToast(liveVisualsOn?'Live-Visuals an':'Live-Visuals aus');});
   function resize(){const r=canvas.getBoundingClientRect();if(!r.width||!r.height)return;renderer.setSize(r.width,r.height,false);camera.aspect=r.width/r.height;camera.updateProjectionMatrix();setCamera();}
   new ResizeObserver(resize).observe(canvas);setCamera();renderSequencer();rebuild();
-  function animate(){requestAnimationFrame(animate);if(mesh&&autoSpin&&!pointers.size)modelGroup.rotateY(.0022);renderer.render(scene,camera);}animate();
+  function animate(time){requestAnimationFrame(animate);if(mesh&&autoSpin&&!pointers.size)modelGroup.rotateY(.0022);updateLiveVisuals(time);renderer.render(scene,camera);}animate();
 })();
 </script>
 </body>
