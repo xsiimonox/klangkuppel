@@ -220,7 +220,11 @@ lead: x--x--x-</textarea>
   function scheduleNoise(ctx,out,t,type){const s=ctx.createBufferSource(),f=ctx.createBiquadFilter(),g=ctx.createGain();s.buffer=noiseBuffer(ctx,type==='hat'?.08:.28);f.type='highpass';f.frequency.value=type==='hat'?6500:1100;g.gain.setValueAtTime(type==='hat'?.16:.34,t);g.gain.exponentialRampToValueAtTime(.001,t+(type==='hat'?.07:.22));s.connect(f).connect(g).connect(out);s.start(t);}
   function scheduleTone(ctx,out,t,type,step,dur){const o=ctx.createOscillator(),g=ctx.createGain(),filter=ctx.createBiquadFilter(),scale=[0,2,3,5,7,10,7,5],semi=scale[step%scale.length],base=type==='bass'?82.41:261.63;o.type=type==='bass'?'sawtooth':'triangle';o.frequency.value=base*Math.pow(2,semi/12);filter.type='lowpass';filter.frequency.value=type==='bass'?650:2200;g.gain.setValueAtTime(type==='bass'?.18:.12,t);g.gain.exponentialRampToValueAtTime(.001,t+dur*.88);o.connect(filter).connect(g).connect(out);o.start(t);o.stop(t+dur);}
   async function renderPatternAudio(makeShape){
-    if(patternRendering)return;if(activeMode==='code')applyCode();patternRendering=true;$('listenPattern').disabled=true;$('makeForm').disabled=true;stopAudio();
+    if(patternRendering)return;if(activeMode==='code')applyCode();
+    if(!modeConfig[activeMode].tracks.some(k=>patterns[k].slice(0,modeConfig[activeMode].steps).some(Boolean))){showToast('Aktiviere zuerst mindestens ein Klangfeld');return;}
+    // Unlock playback during the original tap, before asynchronous rendering (Safari/iPad).
+    audioCtx=audioCtx||new(window.AudioContext||window.webkitAudioContext)();await audioCtx.resume();
+    patternRendering=true;$('listenPattern').disabled=true;$('makeForm').disabled=true;stopAudio();
     try{const cfg=modeConfig[activeMode],bpm=+$('tempo').value,stepDur=60/bpm/4,loops=cfg.steps===8?4:2,duration=cfg.steps*stepDur*loops+.5,sr=44100,offline=new OfflineAudioContext(1,Math.ceil(duration*sr),sr),master=offline.createGain(),comp=offline.createDynamicsCompressor();master.gain.value=.72;master.connect(comp).connect(offline.destination);
       for(let loop=0;loop<loops;loop++)for(let step=0;step<cfg.steps;step++){const t=(loop*cfg.steps+step)*stepDur;for(const key of cfg.tracks)if(patterns[key][step]){if(key==='kick')scheduleKick(offline,master,t);else if(key==='snare'||key==='hat')scheduleNoise(offline,master,t,key);else scheduleTone(offline,master,t,key,step,stepDur*.92);}}
       audioBuffer=await offline.startRendering();$('playBtn').disabled=false;$('fileStatus').textContent='Musiklabor · '+activeModeLabel()+' · '+bpm+' BPM';
@@ -278,12 +282,16 @@ lead: x--x--x-</textarea>
     for(let j=1;j<rings;j++)for(let i=0;i<segs;i++){const n=(i+1)%segs,a=1+(j-1)*segs+i,b=1+(j-1)*segs+n,d=1+j*segs+i,e=1+j*segs+n;idx.push(a,d,b,b,d,e);}
     // vertical rim down to flat base
     const bottomStart=pos.length/3;
-    for(let i=0;i<segs;i++){const u=i/segs,e=sampleMap(map,u,0),rr=radius+state.relief*Math.pow(e,1+state.sharpness*2.4)*.86;pos.push(rr*Math.cos(u*Math.PI*2),-state.baseHeight,rr*Math.sin(u*Math.PI*2));col.push(.18,.17,.24);}
+    for(let i=0;i<segs;i++){const rimIndex=(1+(rings-1)*segs+i)*3;pos.push(pos[rimIndex],-state.baseHeight,pos[rimIndex+2]);col.push(.18,.17,.24);}
     const topRim=1+(rings-1)*segs;
     for(let i=0;i<segs;i++){const n=(i+1)%segs,a=topRim+i,b=topRim+n,c1=bottomStart+i,d=bottomStart+n;idx.push(a,c1,b,b,c1,d);}
     // flat, triangulated bottom; center lies below the equator
     const center=pos.length/3;pos.push(0,-state.baseHeight,0);col.push(.12,.12,.17);
     for(let i=0;i<segs;i++){const n=(i+1)%segs;idx.push(center,bottomStart+n,bottomStart+i);}
+    // Normalize the widest radial extent to exactly 80 mm; point every face outward.
+    let maxRadius=0;for(let i=0;i<pos.length;i+=3)maxRadius=Math.max(maxRadius,Math.hypot(pos[i],pos[i+2]));
+    for(let i=0;i<pos.length;i+=3){pos[i]*=40/maxRadius;pos[i+2]*=40/maxRadius;}
+    for(let i=0;i<idx.length;i+=3)[idx[i+1],idx[i+2]]=[idx[i+2],idx[i+1]];
     const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));g.setIndex(idx);g.computeVertexNormals();g.computeBoundingSphere();
     if(mesh){modelGroup.remove(mesh);mesh.geometry.dispose();} mesh=new THREE.Mesh(g,mat);mesh.position.y=-18;modelGroup.add(mesh);mat.wireframe=state.wire;
     geometryInfo={triangles:idx.length/3,maxHeight:maxY+state.baseHeight};
@@ -323,7 +331,7 @@ lead: x--x--x-</textarea>
   function exportSTL(){
     if(!mesh)return;const g=mesh.geometry,index=g.index,position=g.attributes.position,tri=index.count/3,buffer=new ArrayBuffer(84+tri*50),view=new DataView(buffer);const header='KlangKuppel · 80mm · watertight';for(let i=0;i<header.length;i++)view.setUint8(i,header.charCodeAt(i));view.setUint32(80,tri,true);let o=84;
     const a=new THREE.Vector3(),b=new THREE.Vector3(),c=new THREE.Vector3(),n=new THREE.Vector3();
-    for(let i=0;i<index.count;i+=3){a.fromBufferAttribute(position,index.getX(i));b.fromBufferAttribute(position,index.getX(i+1));c.fromBufferAttribute(position,index.getX(i+2));n.subVectors(b,a).cross(new THREE.Vector3().subVectors(c,a)).normalize();for(const v of[n,a,b,c]){view.setFloat32(o,v.x,true);view.setFloat32(o+4,v.y,true);view.setFloat32(o+8,v.z,true);o+=12;}view.setUint16(o,0,true);o+=2;}
+    for(let i=0;i<index.count;i+=3){a.fromBufferAttribute(position,index.getX(i));b.fromBufferAttribute(position,index.getX(i+1));c.fromBufferAttribute(position,index.getX(i+2));for(const v of[a,b,c])v.set(v.x,-v.z,v.y+state.baseHeight);n.subVectors(b,a).cross(new THREE.Vector3().subVectors(c,a)).normalize();for(const v of[n,a,b,c]){view.setFloat32(o,v.x,true);view.setFloat32(o+4,v.y,true);view.setFloat32(o+8,v.z,true);o+=12;}view.setUint16(o,0,true);o+=2;}
     const blob=new Blob([buffer],{type:'model/stl'}),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download='KlangKuppel_'+new Date().toISOString().slice(0,10)+'.stl';document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),2000);showToast('STL exportiert · '+Math.round(blob.size/1024)+' KB');
   }
 
@@ -344,7 +352,7 @@ lead: x--x--x-</textarea>
 
   // Dependency-free virtual trackball: full X/Y/Z rotation, pinch zoom and two-finger roll.
   let distance=142,pointers=new Map(),lastPinch=0,lastTwist=0,autoSpin=true;
-  function setCamera(){distance=Math.max(82,Math.min(235,distance));camera.position.set(0,18,distance);camera.lookAt(0,18,0);}
+  function setCamera(){distance=Math.max(82,Math.min(235,distance));const fit=Math.max(1,1/Math.max(.25,camera.aspect));camera.position.set(0,18,distance*fit*1.3);camera.lookAt(0,18,0);}
   function trackballPoint(x,y){const r=canvas.getBoundingClientRect(),nx=(x-r.left)/r.width*2-1,ny=1-(y-r.top)/r.height*2,d=nx*nx+ny*ny;if(d>1){const s=1/Math.sqrt(d);return new THREE.Vector3(nx*s,ny*s,0);}return new THREE.Vector3(nx,ny,Math.sqrt(1-d));}
   function disableAuto(){autoSpin=false;$('autoRotate').classList.remove('active');$('autoRotate').setAttribute('aria-pressed','false');}
   function touchMetrics(){const ps=[...pointers.values()];if(ps.length<2)return;lastPinch=Math.hypot(ps[0].x-ps[1].x,ps[0].y-ps[1].y);lastTwist=Math.atan2(ps[1].y-ps[0].y,ps[1].x-ps[0].x);}
@@ -359,7 +367,7 @@ lead: x--x--x-</textarea>
   document.querySelectorAll('[data-view]').forEach(b=>b.addEventListener('click',()=>setView(b.dataset.view)));
   $('autoRotate').addEventListener('click',()=>{autoSpin=!autoSpin;$('autoRotate').classList.toggle('active',autoSpin);$('autoRotate').setAttribute('aria-pressed',String(autoSpin));});
   $('turntable').addEventListener('click',()=>{const show=!grid.visible;grid.visible=floor.visible=show;$('turntable').classList.toggle('active',show);$('turntable').setAttribute('aria-pressed',String(show));});
-  function resize(){const r=canvas.getBoundingClientRect();renderer.setSize(r.width,r.height,false);camera.aspect=r.width/r.height;camera.updateProjectionMatrix();}
+  function resize(){const r=canvas.getBoundingClientRect();if(!r.width||!r.height)return;renderer.setSize(r.width,r.height,false);camera.aspect=r.width/r.height;camera.updateProjectionMatrix();setCamera();}
   new ResizeObserver(resize).observe(canvas);setCamera();renderSequencer();rebuild();
   function animate(){requestAnimationFrame(animate);if(mesh&&autoSpin&&!pointers.size)modelGroup.rotateY(.0022);renderer.render(scene,camera);}animate();
 })();
