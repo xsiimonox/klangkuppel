@@ -86,7 +86,7 @@
 <body>
 <div class="app">
   <header>
-    <div class="brand"><div class="brand-mark" aria-hidden="true"></div><div>KlangKuppel<small>Music → Matter Lab · v1.8.0</small></div></div>
+    <div class="brand"><div class="brand-mark" aria-hidden="true"></div><div>KlangKuppel<small>Music → Matter Lab · v1.8.1</small></div></div>
     <div class="header-note">Alles bleibt auf diesem Gerät</div>
   </header>
   <main>
@@ -135,7 +135,7 @@ lead: x--x--x-</textarea>
       <div class="timeline" aria-label="Song-Timeline">
         <label for="timeline"><span>⌁ Song-Timeline · Form-Fokus</span><b id="timelineOut">Demo · 50 %</b></label>
         <input id="timeline" type="range" min="0" max="1000" value="500" step="1" aria-label="Position im Song für die 3D-Ansicht">
-        <small><span>Anfang</span><span>Gewählter Songabschnitt für die Kuppel</span><span>Ende</span></small>
+        <small><span>Anfang</span><span>Gewählter Beat/Abschnitt wird als Kuppel dargestellt</span><span>Ende</span></small>
       </div>
 
       <section class="section">
@@ -158,7 +158,7 @@ lead: x--x--x-</textarea>
       </section>
 
       <button class="btn export" id="exportBtn">STL für 3D-Druck exportieren</button>
-      <p class="fineprint">Einheit: Millimeter · Durchmesser: 80 mm · geschlossener Volumenkörper · empfohlen: 0,2-mm-Schichthöhe, flache Seite aufs Druckbett.</p>
+      <p class="fineprint">Einheit: Millimeter · Durchmesser: 80 mm · geschlossener Volumenkörper · STL speichert den aktuell gewählten Timeline-Moment · empfohlen: 0,2-mm-Schichthöhe, flache Seite aufs Druckbett.</p>
     </aside>
 
     <section class="stage" aria-label="Interaktive 3D-Vorschau">
@@ -263,7 +263,7 @@ lead: x--x--x-</textarea>
     try{const sr=22050,ctx=new OfflineAudioContext(1,Math.ceil((cfg.steps*dur+.35)*sr),sr),out=ctx.createGain();out.gain.value=.85;out.connect(ctx.destination);
       for(let step=0;step<cfg.steps;step++)for(const key of cfg.tracks)if(snapshot[key][step])scheduleNote(ctx,out,step*dur,key,step,dur);
       const buffer=await ctx.startRendering(),map=await analyze(buffer),empty=!Object.values(snapshot).some(row=>row.some(Boolean));
-      if(revision===shapeRevision){audioBuffer=buffer;spectral=map;labShape={patterns:snapshot,steps:cfg.steps,empty};rebuild();$('playBtn').disabled=empty;$('fileStatus').textContent=empty?'Leeres Pattern · glatte Kuppel':'Live-Loop · '+mode+' · '+bpm+' BPM';$('analysisBadge').textContent=empty?'● LIVE · GLATTE KUPPEL':'● LIVE · '+mode.toUpperCase();$('analysisBadge').dataset.revision=revision;}
+      if(revision===shapeRevision){audioBuffer=buffer;spectral=map;labShape={patterns:snapshot,steps:cfg.steps,empty};updateTimelineLabel();rebuild();$('playBtn').disabled=empty;$('fileStatus').textContent=empty?'Leeres Pattern · glatte Kuppel':'Live-Loop · '+mode+' · '+bpm+' BPM';$('analysisBadge').textContent=empty?'● LIVE · GLATTE KUPPEL':'● LIVE · '+mode.toUpperCase();$('analysisBadge').dataset.revision=revision;}
     }catch(err){console.error(err);showToast('Live-Form konnte nicht aktualisiert werden');}
     finally{patternRendering=false;if(revision!==shapeRevision){clearTimeout(shapeTimer);shapeTimer=setTimeout(updateLiveShape,0);}else $('exportBtn').disabled=false;}
   }
@@ -322,9 +322,9 @@ lead: x--x--x-</textarea>
     // Coordinates are normalized to the print footprint; Gaussian joins stay continuous.
     const scattered=(count,offset)=>Array.from({length:count},(_,k)=>{const a=k*2.399963+offset,r=.93*Math.sqrt((k+.5)/count);return{x:r*Math.cos(a),z:r*Math.sin(a),width:.06+(k%3)*.017,strength:.3+sampleMap(map,k/count,.25+(k%3)*.25)*1.8};});
     const peaks=scattered(29,.6),domes=scattered(22,2.1),motifs=scattered(13,0);
-    const patternEvents=(key,offset=0)=>{if(!labShape||!labShape.patterns[key])return[];const row=labShape.patterns[key],n=row.length;return row.flatMap((on,k)=>{if(!on)return[];const a=(k/n)*Math.PI*2+offset,r=.2+.67*((k*.61803398875+offset*.13)%1);return[{x:r*Math.cos(a),z:r*Math.sin(a),width:.12+(k%3)*.018,step:k/n}];});};
+    const patternEvents=(key,offset=0)=>{if(!labShape||!labShape.patterns[key])return[];const row=labShape.patterns[key],n=row.length,beat=Math.min(n-1,Math.floor(timelineFocus*n));return row.flatMap((on,k)=>{if(!on||k!==beat)return[];const a=(k/n)*Math.PI*2+offset,r=.2+.67*((k*.61803398875+offset*.13)%1);return[{x:r*Math.cos(a),z:r*Math.sin(a),width:.12+(k%3)*.018,step:k/n}];});};
     const kickEvents=patternEvents('kick',.25),snareEvents=patternEvents('snare',1.2),leadEvents=patternEvents('lead',2.3);
-    const presence=key=>labShape&&labShape.patterns[key]&&labShape.patterns[key].some(Boolean)?1:0;
+    const presence=key=>{if(!labShape||!labShape.patterns[key])return 0;const beat=Math.min(labShape.steps-1,Math.floor(timelineFocus*labShape.steps));return labShape.patterns[key][beat]?1:0;};
     const bassOn=presence('bass'),hatOn=presence('hat');
     // A single shared pole keeps the STL topologically watertight.
     const poleRadius=radius;
@@ -424,7 +424,7 @@ lead: x--x--x-</textarea>
   }
 
   function formatTime(s){return Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0');}
-  function updateTimelineLabel(){const value=Math.round(timelineFocus*1000);$('timeline').value=value;$('timelineOut').textContent=audioBuffer&&!labShape?formatTime(timelineFocus*audioBuffer.duration)+' / '+formatTime(audioBuffer.duration):'Loop · '+Math.round(timelineFocus*100)+' %';}
+  function updateTimelineLabel(){const slider=$('timeline');if(labShape){const steps=labShape.steps,beat=Math.min(steps-1,Math.floor(timelineFocus*steps));slider.min=0;slider.max=steps-1;slider.step=1;slider.value=beat;$('timelineOut').textContent='Beat '+(beat+1)+' / '+steps;return;}slider.min=0;slider.max=1000;slider.step=1;slider.value=Math.round(timelineFocus*1000);$('timelineOut').textContent=audioBuffer?formatTime(timelineFocus*audioBuffer.duration)+' / '+formatTime(audioBuffer.duration):'Demo · '+Math.round(timelineFocus*100)+' %';}
   function setTimelineFocus(value,rebuildNow=false){timelineFocus=Math.max(0,Math.min(1,value));updateTimelineLabel();if(rebuildNow)rebuild();else if(!timelineRaf)timelineRaf=requestAnimationFrame(()=>{timelineRaf=0;rebuild();});}
   function playUploadedAt(offset){if(!audioBuffer)return;if(source){source.onended=null;try{source.stop()}catch(e){}}source=audioCtx.createBufferSource();const gain=audioCtx.createGain();gain.gain.value=masterVolume;source.buffer=audioBuffer;source.connect(gain);connectAudioAnalysis(gain);audioOffset=Math.max(0,Math.min(audioBuffer.duration-.01,offset));audioStartedAt=audioCtx.currentTime;source.onended=()=>{source=null;playing=false;audioOffset=0;setFluidActive(false);$('playBtn').textContent='▶ Anhören';$('listenPattern').textContent='▶ Play · Live';};source.start(0,audioOffset);}
   function stopAudio(){labPlaying=false;clearInterval(labTimer);if(labOutput){labOutput.disconnect();labOutput=null;}document.querySelectorAll('.step.playing').forEach(b=>b.classList.remove('playing'));if(source){if(audioBuffer&&audioStartedAt)audioOffset=Math.min(audioBuffer.duration,audioOffset+audioCtx.currentTime-audioStartedAt);source.onended=null;try{source.stop()}catch(e){}source=null;}playing=false;fluidPulse=0;setFluidActive(false);$('playBtn').textContent='▶ Anhören';$('listenPattern').textContent='▶ Play · Live';}
@@ -434,7 +434,8 @@ lead: x--x--x-</textarea>
     if(!mesh)return;const g=mesh.geometry,index=g.index,position=g.attributes.position,tri=index.count/3,buffer=new ArrayBuffer(84+tri*50),view=new DataView(buffer);const header='KlangKuppel · 80mm · watertight';for(let i=0;i<header.length;i++)view.setUint8(i,header.charCodeAt(i));view.setUint32(80,tri,true);let o=84;
     const a=new THREE.Vector3(),b=new THREE.Vector3(),c=new THREE.Vector3(),n=new THREE.Vector3();
     for(let i=0;i<index.count;i+=3){a.fromBufferAttribute(position,index.getX(i));b.fromBufferAttribute(position,index.getX(i+1));c.fromBufferAttribute(position,index.getX(i+2));for(const v of[a,b,c])v.set(v.x,-v.z,v.y+state.baseHeight);n.subVectors(b,a).cross(new THREE.Vector3().subVectors(c,a)).normalize();for(const v of[n,a,b,c]){view.setFloat32(o,v.x,true);view.setFloat32(o+4,v.y,true);view.setFloat32(o+8,v.z,true);o+=12;}view.setUint16(o,0,true);o+=2;}
-    const blob=new Blob([buffer],{type:'model/stl'}),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download='KlangKuppel_'+new Date().toISOString().slice(0,10)+'.stl';document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),2000);showToast('STL exportiert · '+Math.round(blob.size/1024)+' KB');
+    const focusName=labShape?'_Beat_'+(Math.min(labShape.steps-1,Math.floor(timelineFocus*labShape.steps))+1):'_Position_'+Math.round(timelineFocus*100)+'pct';
+    const blob=new Blob([buffer],{type:'model/stl'}),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download='KlangKuppel_'+new Date().toISOString().slice(0,10)+focusName+'.stl';document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),2000);showToast('STL exportiert · '+Math.round(blob.size/1024)+' KB');
   }
 
   function showToast(msg){toast.textContent=msg;toast.classList.add('show');clearTimeout(showToast.t);showToast.t=setTimeout(()=>toast.classList.remove('show'),2600);}
@@ -449,8 +450,8 @@ lead: x--x--x-</textarea>
   $('audioFile').addEventListener('change',e=>loadAudio(e.target.files[0]));$('playBtn').addEventListener('click',()=>{try{unlockAudio().catch(()=>{});}catch(err){showToast(err.message);}toggleAudio();});$('exportBtn').addEventListener('click',exportSTL);
   document.querySelectorAll('.mode-tab').forEach(tab=>tab.addEventListener('click',()=>{activeMode=tab.dataset.mode;document.querySelectorAll('.mode-tab').forEach(t=>{t.classList.toggle('active',t===tab);t.setAttribute('aria-selected',t===tab?'true':'false');});if(activeMode==='code')syncCodeFromPattern();renderSequencer();showToast('Modus: '+activeModeLabel());}));
   $('tempo').addEventListener('input',e=>$('tempoOut').textContent=e.target.value+' BPM');
-  $('timeline').addEventListener('input',e=>setTimelineFocus(+e.target.value/1000));
-  $('timeline').addEventListener('change',e=>{const position=+e.target.value/1000;timelineFocus=position;updateTimelineLabel();if(labPlaying||labShape){const cfg=modeConfig[activeMode];nextStep=Math.floor(position*cfg.steps);if(labPlaying)nextTime=audioCtx.currentTime+.02;showToast('Loop-Fokus: Schritt '+(nextStep+1));}else if(audioBuffer){audioOffset=position*audioBuffer.duration;if(playing)playUploadedAt(audioOffset);showToast('Songposition: '+formatTime(audioOffset));}});
+  $('timeline').addEventListener('input',e=>{const position=labShape?+e.target.value/labShape.steps:+e.target.value/1000;setTimelineFocus(position);});
+  $('timeline').addEventListener('change',e=>{const position=labShape?+e.target.value/labShape.steps:+e.target.value/1000;timelineFocus=position;updateTimelineLabel();if(labPlaying||labShape){const cfg=modeConfig[activeMode];nextStep=Math.floor(position*cfg.steps);if(labPlaying)nextTime=audioCtx.currentTime+.02;rebuild();showToast('Beat '+(nextStep+1)+' ist für STL ausgewählt');}else if(audioBuffer){audioOffset=position*audioBuffer.duration;if(playing)playUploadedAt(audioOffset);showToast('Songposition: '+formatTime(audioOffset));}});
   $('volume').addEventListener('input',e=>{masterVolume=+e.target.value/100;$('volumeOut').textContent=e.target.value+' %';if(labOutput&&audioCtx)labOutput.gain.setTargetAtTime(masterVolume,audioCtx.currentTime,.015);});
   $('randomPattern').addEventListener('click',()=>{const cfg=modeConfig[activeMode];for(const key of cfg.tracks)for(let i=0;i<cfg.steps;i++){const density=key==='hat'?.48:key==='kick'?.28:.2;patterns[key][i]=Math.random()<density;}if(activeMode==='code')syncCodeFromPattern();renderSequencer();});
   $('clearPattern').addEventListener('click',()=>{const cfg=modeConfig[activeMode];for(const key of cfg.tracks)for(let i=0;i<cfg.steps;i++)patterns[key][i]=false;if(activeMode==='code')syncCodeFromPattern();renderSequencer();});
@@ -461,7 +462,7 @@ lead: x--x--x-</textarea>
   for(const id of ['randomPattern','clearPattern'])$(id).addEventListener('click',queueLiveShape);
   document.querySelectorAll('.mode-tab').forEach(tab=>tab.addEventListener('click',queueLiveShape));
   document.addEventListener('visibilitychange',()=>{if(document.hidden)stopAudio();});
-  $('demoBtn').addEventListener('click',()=>{stopAudio();audioBuffer=null;labShape=null;$('playBtn').disabled=true;spectral=makeDemo(++demoSeed);rebuild();$('fileStatus').textContent='Neues Demo-Klangmuster ist aktiv';$('analysisBadge').textContent='● DEMO · SYNTHETISCHE KLANGDATEN';showToast('Neue Demoform erzeugt');});
+  $('demoBtn').addEventListener('click',()=>{stopAudio();audioBuffer=null;labShape=null;timelineFocus=.5;updateTimelineLabel();$('playBtn').disabled=true;spectral=makeDemo(++demoSeed);rebuild();$('fileStatus').textContent='Neues Demo-Klangmuster ist aktiv';$('analysisBadge').textContent='● DEMO · SYNTHETISCHE KLANGDATEN';showToast('Neue Demoform erzeugt');});
   const drop=$('dropZone');for(const ev of['dragenter','dragover'])drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('drag')});for(const ev of['dragleave','drop'])drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('drag')});drop.addEventListener('drop',e=>loadAudio(e.dataTransfer.files[0]));
 
   // Dependency-free virtual trackball: full X/Y/Z rotation, pinch zoom and two-finger roll.
